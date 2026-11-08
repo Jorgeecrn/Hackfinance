@@ -5,35 +5,60 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Centinela</title>
   <meta name="description" content="Te avisa si un mensaje que recibes puede ser una estafa.">
-  <meta name="theme-color" content="#1f4e79">
+  <meta name="theme-color" content="#f5f1ea">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <a class="sr-only" href="#main">Ir al contenido</a>
   <div class="app">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Centinela, inicio"><img src="/icons/icon-192.png" alt=""><span class="brand-name">Centinela</span></a>
+      <a class="brand" href="/" aria-label="Centinela, inicio">
+        <span class="logo"><svg class="i"><use href="/icons.svg#shield-check"/></svg></span>
+        <span class="brand-name">Centinela</span>
+      </a>
       <div class="row">
         <span id="protection-pill" class="pill" role="status"><span class="dot"></span><span>…</span></span>
-        <button class="btn btn-icon btn-outline" id="btn-settings" aria-label="Ajustes">⚙️</button>
+        <button class="btn btn-icon btn-outline" id="btn-settings" aria-label="Ajustes"><svg class="i"><use href="/icons.svg#sliders"/></svg></button>
       </div>
     </header>
 
     <main id="main">
       <!-- INICIO -->
       <section id="view-home" aria-labelledby="greeting">
-        <h1 id="greeting">Hola</h1>
-        <p class="muted">Te aviso si un mensaje puede ser un timo. Ante la duda, compruébalo aquí.</p>
-        <div id="shield-banner" class="banner shield hidden" role="status"></div>
-        <div class="actions">
-          <button class="btn btn-primary btn-big" id="btn-check">🔍 Comprobar un mensaje</button>
-          <button class="btn btn-big btn-outline" id="btn-record-home">🎙️ Leer el mensaje en voz alta</button>
+        <div class="greeting">
+          <p class="hello" id="hello">Hola,</p>
+          <h1 id="greeting">Bienvenida</h1>
         </div>
+
+        <div id="hero" class="hero" role="status">
+          <div class="hero-shield"><div class="core"><svg class="i" id="hero-icon"><use href="/icons.svg#shield-check"/></svg></div></div>
+          <h2 id="hero-title">Estás protegida</h2>
+          <p id="hero-sub">Reviso tus mensajes nuevos y te aviso si hay peligro.</p>
+          <div class="stats" id="hero-stats"></div>
+        </div>
+
+        <div id="shield-banner" class="banner shield hidden" role="status"></div>
+
+        <div class="actions" style="margin-top:0">
+          <button class="action-card primary" id="btn-check">
+            <span class="ac-icon"><svg class="i"><use href="/icons.svg#search"/></svg></span>
+            <span class="ac-text"><span class="ac-title">Comprobar un mensaje</span><span class="ac-sub">Pégalo, comparte una captura o una nota de voz</span></span>
+            <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
+          </button>
+          <button class="action-card" id="btn-record-home">
+            <span class="ac-icon"><svg class="i"><use href="/icons.svg#mic"/></svg></span>
+            <span class="ac-text"><span class="ac-title btn-label">Leer el mensaje en voz alta</span><span class="ac-sub">Lo escucho y te digo si es un timo</span></span>
+            <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
+          </button>
+        </div>
+
         <div class="card">
-          <h2>Mensajes recibidos</h2>
+          <div class="card-title"><h2>Mensajes recibidos</h2><svg class="i muted"><use href="/icons.svg#inbox"/></svg></div>
           <p class="muted small" id="inbox-help">Cuando la protección está activada, reviso solos los mensajes nuevos.</p>
           <ul class="inbox" id="inbox" aria-live="polite"></ul>
         </div>
@@ -41,30 +66,37 @@
 
       <!-- COMPROBAR -->
       <section id="view-check" class="hidden" aria-labelledby="check-title">
-        <h1 id="check-title">Comprobar un mensaje</h1>
+        <div class="greeting">
+          <p class="hello">Ante la duda, pregúntame</p>
+          <h1 id="check-title">Comprobar un mensaje</h1>
+        </div>
         <div class="card">
-          <label for="check-text">Pega aquí el mensaje que te ha llegado</label>
+          <label for="check-text" style="margin-top:0">Pega aquí el mensaje que te ha llegado</label>
           <textarea id="check-text" placeholder="Por ejemplo: «Hola mamá, este es mi número nuevo…»"></textarea>
-          <label for="check-sender">¿Quién lo envía? <span class="muted">(opcional: número o nombre)</span></label>
+          <label for="check-sender">¿Quién lo envía? <span class="muted" style="font-weight:400">(opcional: número o nombre)</span></label>
           <input id="check-sender" type="text" inputmode="tel" autocomplete="off" placeholder="+34 6..." >
           <div class="actions two">
-            <label class="btn btn-outline" for="file-image" style="margin:0">📷 Añadir captura</label>
-            <label class="btn btn-outline" for="file-audio" style="margin:0">🎧 Añadir nota de voz</label>
+            <label class="btn btn-outline file-btn" for="file-image"><svg class="i"><use href="/icons.svg#camera"/></svg> Añadir captura</label>
+            <label class="btn btn-outline file-btn" for="file-audio"><svg class="i"><use href="/icons.svg#headphones"/></svg> Añadir nota de voz</label>
           </div>
           <input id="file-image" type="file" accept="image/*" class="sr-only">
           <input id="file-audio" type="file" accept="audio/*" class="sr-only">
-          <p id="file-chosen" class="muted small" aria-live="polite"></p>
+          <p id="file-chosen" class="muted small" aria-live="polite" style="margin-top:10px"></p>
           <div class="actions">
-            <button class="btn btn-big btn-outline" id="btn-record">🎙️ Grabar: leo el mensaje o pongo el audio</button>
-            <button class="btn btn-primary btn-big" id="btn-analyze">Comprobar ahora</button>
-            <button class="btn btn-outline" data-back>← Volver</button>
+            <button class="btn btn-primary btn-big" id="btn-analyze"><svg class="i"><use href="/icons.svg#shield-check"/></svg> Comprobar ahora</button>
+            <button class="btn btn-big btn-outline" id="btn-record"><svg class="i"><use href="/icons.svg#mic"/></svg> <span class="btn-label">Grabar: leo el mensaje o pongo el audio</span></button>
+            <button class="btn btn-ghost" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
           </div>
         </div>
       </section>
 
       <!-- INVESTIGANDO -->
       <section id="view-progress" class="hidden" aria-labelledby="progress-title">
-        <h1 id="progress-title">Comprobando…</h1>
+        <div class="scan">
+          <div class="scan-orb"><div class="core"><svg class="i"><use href="/icons.svg#search"/></svg></div></div>
+          <h1 id="progress-title">Comprobando…</h1>
+          <p class="muted">Estoy investigando el mensaje. Tardo unos segundos.</p>
+        </div>
         <div class="card">
           <ul class="steps" id="steps" aria-live="polite"></ul>
         </div>
@@ -73,12 +105,15 @@
       <!-- RESULTADO -->
       <section id="view-result" class="hidden" aria-labelledby="result-title">
         <div id="result"></div>
-        <button class="btn btn-outline btn-big" data-back>← Volver al inicio</button>
+        <button class="btn btn-outline btn-big" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver al inicio</button>
       </section>
 
       <!-- AJUSTES -->
       <section id="view-settings" class="hidden" aria-labelledby="settings-title">
-        <h1 id="settings-title">Ajustes</h1>
+        <div class="greeting">
+          <p class="hello">Tu protección, a tu manera</p>
+          <h1 id="settings-title">Ajustes</h1>
+        </div>
         <div class="card">
           <div class="switch-row">
             <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa solo los mensajes que te llegan y te avisa si son sospechosos.</span></div>
@@ -97,12 +132,23 @@
           <h2>Tus datos</h2>
           <label for="set-nombre">Tu nombre</label>
           <input id="set-nombre" type="text" autocomplete="given-name">
-          <label for="set-letra">Tamaño de la letra</label>
-          <select id="set-letra">
-            <option value="normal">Normal</option>
-            <option value="grande">Grande</option>
-            <option value="muy-grande">Muy grande</option>
-          </select>
+          <div class="grid-2">
+            <div>
+              <label for="set-letra">Tamaño de la letra</label>
+              <select id="set-letra">
+                <option value="normal">Normal</option>
+                <option value="grande">Grande</option>
+                <option value="muy-grande">Muy grande</option>
+              </select>
+            </div>
+            <div>
+              <label for="set-tema">Colores</label>
+              <select id="set-tema">
+                <option value="light">Claro</option>
+                <option value="dark">Oscuro</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div class="card">
           <h2>Familiar de confianza</h2>
@@ -124,17 +170,17 @@
           </div>
           <label for="new-contact-rel">Parentesco</label>
           <input id="new-contact-rel" type="text">
-          <div class="actions"><button class="btn btn-outline" id="btn-add-contact">＋ Añadir contacto</button></div>
+          <div class="actions"><button class="btn btn-outline" id="btn-add-contact"><svg class="i"><use href="/icons.svg#plus"/></svg> Añadir contacto</button></div>
         </div>
         <details class="card">
           <summary>Opciones avanzadas</summary>
           <label for="set-voz-id">ID de voz de ElevenLabs (por ejemplo, la voz de tu nieto con su permiso)</label>
           <input id="set-voz-id" type="text" placeholder="Vacío = voz por defecto">
-          <p class="muted small" id="health"></p>
+          <p class="muted small" id="health" style="margin-top:10px"></p>
         </details>
         <div class="actions">
-          <button class="btn btn-primary btn-big" id="btn-save-settings">Guardar</button>
-          <button class="btn btn-outline" data-back>← Volver</button>
+          <button class="btn btn-primary btn-big" id="btn-save-settings"><svg class="i"><use href="/icons.svg#check"/></svg> Guardar</button>
+          <button class="btn btn-ghost" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
         </div>
       </section>
     </main>

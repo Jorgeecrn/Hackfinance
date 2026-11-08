@@ -69,6 +69,36 @@ export function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Icono de línea del sprite /icons.svg. */
+export function icon(name, cls = "") {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", ("i " + cls).trim());
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(SVG_NS, "use");
+  use.setAttribute("href", `/icons.svg#${name}`);
+  svg.append(use);
+  return svg;
+}
+
+/** Iniciales para avatares («Lucía López» → «LL»; números → icono). */
+export function initials(name = "") {
+  const clean = name.replace(/\(.*?\)/g, "").trim();
+  if (!clean || /^[+\d\s]+$/.test(clean)) return null;
+  return clean.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+
+/** Tema claro/oscuro (preferencia local del dispositivo). */
+export function getTheme() {
+  try { return localStorage.getItem("centinela-tema") || "light"; } catch (_) { return "light"; }
+}
+export function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("centinela-tema", theme); } catch (_) { /* sin almacenamiento */ }
+}
+document.documentElement.dataset.theme = getTheme();
+
 export function toast(text, ms = 3500) {
   const t = el("div", { class: "toast", role: "status" }, text);
   document.body.append(t);
@@ -76,15 +106,23 @@ export function toast(text, ms = 3500) {
 }
 
 export const LEVEL = {
-  verde: { icon: "✅", label: "Tranquilo/a", color: "var(--verde)" },
-  amarillo: { icon: "⚠️", label: "Cuidado", color: "var(--amarillo-accent)" },
-  rojo: { icon: "⛔", label: "Peligro", color: "var(--rojo)" },
+  verde: { icon: "check-circle", label: "Seguro", color: "var(--verde)" },
+  amarillo: { icon: "alert", label: "Cuidado", color: "var(--amarillo-accent)" },
+  rojo: { icon: "octagon", label: "Timo", color: "var(--rojo)" },
 };
 
 export function fmtTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   return d.toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Hora si es de hoy; si no, día y mes. */
+export function fmtShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
 export function fmtMoney(n) {

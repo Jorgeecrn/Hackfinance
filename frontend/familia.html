@@ -4,33 +4,44 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Panel familiar</title>
-  <meta name="theme-color" content="#1f4e79">
+  <meta name="theme-color" content="#f5f1ea">
   <link rel="icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="app wide">
     <header class="topbar">
-      <a class="brand" href="/familia.html"><img src="/icons/icon-192.png" alt="">Centinela · Familia</a>
+      <a class="brand" href="/familia.html">
+        <span class="logo"><svg class="i"><use href="/icons.svg#users"/></svg></span>
+        <span>Centinela <small>· Familia</small></span>
+      </a>
       <span id="live" class="pill warn" role="status"><span class="dot"></span><span>Conectando…</span></span>
     </header>
     <main>
       <div class="grid-2">
         <section class="card" aria-labelledby="who">
-          <h2 id="who">Persona protegida</h2>
-          <p class="big-number" id="person">—</p>
-          <div class="row" id="status-pills"></div>
-          <p class="muted small" style="margin-top:10px">Recibirás aquí, al momento, cualquier aviso de posible estafa.</p>
+          <p class="eyebrow" id="who">Persona protegida</p>
+          <div class="row" style="flex-wrap:nowrap">
+            <div class="avatar" id="avatar" aria-hidden="true">—</div>
+            <div style="min-width:0">
+              <p class="big-number" id="person">—</p>
+              <div class="row" id="status-pills" style="gap:8px;margin-top:8px"></div>
+            </div>
+          </div>
+          <div class="stat-grid" id="stats"></div>
         </section>
         <section class="card" aria-labelledby="held-title">
-          <h2 id="held-title">Operaciones retenidas por el escudo</h2>
-          <p class="muted small">Revisa con tu familiar antes de aprobar: si no la reconoce, cancélala.</p>
+          <div class="card-title"><h2 id="held-title">Operaciones retenidas</h2><svg class="i muted"><use href="/icons.svg#lock"/></svg></div>
+          <p class="muted small">El escudo bancario las ha frenado. Habla con tu familiar antes de aprobar: si no la reconoce, cancélala.</p>
           <ul class="feed" id="held"></ul>
         </section>
       </div>
       <section class="card" aria-labelledby="alerts-title">
-        <h2 id="alerts-title">Avisos</h2>
-        <ul class="feed" id="alerts" aria-live="polite"></ul>
+        <div class="card-title"><h2 id="alerts-title">Avisos</h2><svg class="i muted"><use href="/icons.svg#activity"/></svg></div>
+        <p class="muted small">Recibirás aquí, al momento, cualquier aviso de posible estafa.</p>
+        <ul class="timeline" id="alerts" aria-live="polite"></ul>
       </section>
     </main>
   </div>

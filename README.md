@@ -58,6 +58,13 @@ Decisiones clave:
 - (Opcional) Clave de API de ElevenLabs para notas de voz y voz natural
 - Un navegador moderno (Chrome/Edge/Safari/Firefox). Para instalarla como app y usar «Compartir», Chrome en Android.
 
+## Arranque rápido (doble clic)
+
+- **Mac:** doble clic en `iniciar.command`. La primera vez, si macOS lo bloquea, clic derecho → **Abrir** → **Abrir**.
+- **Windows:** doble clic en `iniciar.bat`.
+
+La primera vez prepara el entorno e instala las dependencias (un par de minutos); después arranca en segundos y abre el panel de la demo en el navegador. Deja la ventana abierta mientras la uses. Solo necesitas tener Python 3.11 o superior.
+
 ## Instalación
 
 ```bash

@@ -4,38 +4,65 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Control de la demo</title>
+  <meta name="theme-color" content="#f5f1ea">
   <link rel="icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="app wide">
     <header class="topbar">
-      <a class="brand" href="/demo.html"><img src="/icons/icon-192.png" alt="">Control de la demo</a>
-      <div class="row">
-        <a class="btn btn-small btn-outline" href="/" target="_blank">📱 App</a>
-        <a class="btn btn-small btn-outline" href="/familia.html" target="_blank">👪 Familia</a>
-        <a class="btn btn-small btn-outline" href="/banco.html" target="_blank">🏦 Banco</a>
+      <a class="brand" href="/demo.html">
+        <span class="logo"><svg class="i"><use href="/icons.svg#shield-check"/></svg></span>
+        <span>Centinela <small>· Control de la demo</small></span>
+      </a>
+      <div class="row" style="gap:8px">
+        <a class="btn btn-small btn-outline" href="/" target="_blank"><svg class="i"><use href="/icons.svg#smartphone"/></svg> App</a>
+        <a class="btn btn-small btn-outline" href="/familia.html" target="_blank"><svg class="i"><use href="/icons.svg#users"/></svg> Familia</a>
+        <a class="btn btn-small btn-outline" href="/banco.html" target="_blank"><svg class="i"><use href="/icons.svg#bank"/></svg> Banco</a>
       </div>
     </header>
-    <main>
-      <p class="muted" id="health">Comprobando servicios…</p>
-      <section class="card" aria-labelledby="custom-title">
-        <h2 id="custom-title">Enviar un mensaje al móvil</h2>
-        <p class="muted small">Simula que al móvil de la persona protegida le llega un SMS o WhatsApp. Si tiene la protección activada, se analiza solo.</p>
-        <div class="grid-2">
-          <div><label for="c-sender">Remitente</label><input id="c-sender" type="text" placeholder="+34 711 23 45 67"></div>
-          <div><label for="c-channel">Canal</label>
-            <select id="c-channel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Correo</option></select></div>
+    <main class="demo-layout">
+      <div>
+        <div class="status-row" id="health"><span class="pill">Comprobando servicios…</span></div>
+
+        <section aria-labelledby="samples-title" style="margin-top:18px">
+          <div class="card-title" style="margin-bottom:12px">
+            <h2 id="samples-title">Escenarios</h2>
+            <span class="muted small">Un clic y el mensaje llega al móvil</span>
+          </div>
+          <div class="scenarios" id="samples"></div>
+        </section>
+
+        <section class="card" aria-labelledby="custom-title" style="margin-top:22px">
+          <div class="card-title"><h2 id="custom-title">Mensaje personalizado</h2><svg class="i muted"><use href="/icons.svg#pencil"/></svg></div>
+          <p class="muted small">Simula que al móvil de la persona protegida le llega un SMS o WhatsApp. Si tiene la protección activada, se analiza solo.</p>
+          <div class="grid-2" style="gap:0 16px">
+            <div><label for="c-sender">Remitente</label><input id="c-sender" type="text" placeholder="+34 711 23 45 67"></div>
+            <div><label for="c-channel">Canal</label>
+              <select id="c-channel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Correo</option></select></div>
+          </div>
+          <label for="c-text">Texto</label>
+          <textarea id="c-text"></textarea>
+          <div class="actions"><button class="btn btn-primary" id="btn-send"><svg class="i"><use href="/icons.svg#send"/></svg> Enviar al móvil</button></div>
+        </section>
+
+        <div class="row" style="justify-content:space-between;margin-top:8px">
+          <button class="btn btn-ghost btn-small" id="btn-reset"><svg class="i"><use href="/icons.svg#rotate"/></svg> Reiniciar la demo</button>
+          <label class="row small muted" style="margin:0;font-weight:400;gap:8px;cursor:pointer">
+            <input type="checkbox" id="toggle-phone" style="width:20px;height:20px"> Mostrar el móvil en esta pantalla
+          </label>
         </div>
-        <label for="c-text">Texto</label>
-        <textarea id="c-text"></textarea>
-        <div class="actions"><button class="btn btn-primary" id="btn-send">📨 Enviar al móvil</button></div>
-      </section>
-      <section class="card" aria-labelledby="samples-title">
-        <h2 id="samples-title">Mensajes de ejemplo</h2>
-        <div style="overflow-x:auto"><table><thead><tr><th>Ejemplo</th><th>Tipo</th><th>Remitente</th><th></th></tr></thead><tbody id="samples"></tbody></table></div>
-      </section>
-      <div class="actions"><button class="btn btn-outline" id="btn-reset">↺ Reiniciar la demo (borra mensajes, alertas y banco)</button></div>
+      </div>
+
+      <aside class="phone-col" aria-label="Vista del móvil">
+        <div class="phone" id="phone"><iframe id="phone-frame" title="App de la persona protegida"></iframe></div>
+        <div class="phone-off hidden" id="phone-off">
+          <div><svg class="i i-lg"><use href="/icons.svg#smartphone"/></svg><p style="margin-top:10px">Móvil oculto. Usa la app en un móvil real o vuelve a activarlo abajo.</p></div>
+        </div>
+        <p class="muted small" style="text-align:center;margin-top:12px">Si usas también un móvil real, oculta este para que no se analice cada mensaje dos veces.</p>
+      </aside>
     </main>
   </div>
   <script type="module" src="/js/demo.js"></script>

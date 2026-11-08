@@ -1,6 +1,7 @@
 // App de la persona protegida (PWA).
 import {
   api, streamAnalysis, subscribe, el, toast, LEVEL, fmtTime, CHANNEL, speak, stopSpeaking, unlockAudioOnFirstTouch,
+  icon, initials, getTheme, setTheme, fmtShort,
 } from "./common.js";
 
 const $ = (s) => document.querySelector(s);
@@ -24,14 +25,23 @@ document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("clic
 async function loadProfile() {
   profile = await api("/api/perfil");
   document.documentElement.dataset.letra = profile.tamano_letra || "grande";
-  $("#greeting").textContent = `Hola, ${profile.nombre || ""}`.trim();
+  const h = new Date().getHours();
+  $("#hello").textContent = h < 6 ? "Buenas noches," : h < 14 ? "Buenos días," : h < 21 ? "Buenas tardes," : "Buenas noches,";
+  $("#greeting").textContent = profile.nombre || "Hola";
+  const on = !!profile.proteccion_activa;
+  $("#hero").classList.toggle("off", !on);
+  $("#hero-icon use").setAttribute("href", `/icons.svg#${on ? "shield-check" : "shield-off"}`);
+  $("#hero-title").textContent = on ? "Protección activada" : "Protección desactivada";
+  $("#hero-sub").textContent = on
+    ? "Reviso tus mensajes nuevos y te aviso si hay peligro."
+    : "Ahora mismo no reviso tus mensajes. Actívala en Ajustes.";
   const pill = $("#protection-pill");
   pill.className = "pill " + (profile.proteccion_activa ? "on" : "off");
   pill.querySelector("span:last-child").textContent = profile.proteccion_activa ? "Protegido/a" : "Sin protección";
   pill.setAttribute("aria-label", profile.proteccion_activa ? "Protección contra estafas activada" : "Protección contra estafas desactivada");
   $("#inbox-help").textContent = profile.proteccion_activa
     ? "La protección está activada: reviso solos los mensajes nuevos."
-    : "La protección está desactivada. Puedes activarla en Ajustes ⚙️.";
+    : "La protección está desactivada. Puedes activarla en Ajustes.";
 }
 
 function fillSettings() {
@@ -45,6 +55,7 @@ function fillSettings() {
   $("#set-fam-relacion").value = f.relacion || "";
   $("#set-fam-tel").value = f.telefono || "";
   $("#set-voz-id").value = profile.voz_id || "";
+  $("#set-tema").value = getTheme();
   renderContacts();
   if (health) {
     $("#health").textContent = `IA: ${health.ia ? "activada (" + health.modelo + ")" : "modo básico sin IA"} · Voz ElevenLabs: ${health.voz ? "activada" : "voz del navegador"} · Avisos por Telegram: ${health.telegram ? "sí" : "no"}`;
@@ -55,7 +66,7 @@ function renderContacts() {
   const box = $("#contacts");
   box.replaceChildren(...(profile.contactos || []).map((c, i) =>
     el("span", { class: "chip" }, `${c.nombre} · ${c.telefono}`,
-      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { profile.contactos.splice(i, 1); renderContacts(); } }, "✕"))));
+      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { profile.contactos.splice(i, 1); renderContacts(); } }, icon("x")))));
 }
 
 $("#btn-add-contact").addEventListener("click", () => {
@@ -69,6 +80,7 @@ $("#btn-add-contact").addEventListener("click", () => {
 
 $("#btn-settings").addEventListener("click", () => { fillSettings(); show("settings"); });
 $("#set-letra").addEventListener("change", (e) => (document.documentElement.dataset.letra = e.target.value));
+$("#set-tema").addEventListener("change", (e) => setTheme(e.target.value));
 
 $("#btn-save-settings").addEventListener("click", async () => {
   const body = {
@@ -93,24 +105,37 @@ $("#btn-save-settings").addEventListener("click", async () => {
 async function loadInbox() {
   const msgs = await api("/api/mensajes");
   const list = $("#inbox");
+  renderStats(msgs);
   if (!msgs.length) {
-    list.replaceChildren(el("li", {}, el("p", { class: "muted", style: "padding:12px 0" }, "Todavía no hay mensajes.")));
+    list.replaceChildren(el("li", { class: "empty" }, icon("inbox"), "Todavía no hay mensajes."));
     return;
   }
   list.replaceChildren(...msgs.map(renderInboxItem));
 }
 
+function renderStats(msgs) {
+  const revisados = msgs.filter((m) => m.analisis?.nivel).length;
+  const peligros = msgs.filter((m) => ["rojo", "amarillo"].includes(m.analisis?.nivel)).length;
+  $("#hero-stats").replaceChildren(
+    el("span", { class: "stat" }, `${revisados} ${revisados === 1 ? "mensaje revisado" : "mensajes revisados"}`),
+    el("span", { class: "stat" }, peligros ? `${peligros} ${peligros === 1 ? "peligro frenado" : "peligros frenados"}` : "Ningún peligro"));
+}
+
 function renderInboxItem(m) {
   const level = m.analisis?.nivel;
-  const badge = el("span", { class: `badge ${level || ""}`, "aria-hidden": "true" }, level ? LEVEL[level].icon : "✉️");
+  const ini = initials(m.remitente || "");
+  const badge = el("span", { class: `badge ${level || ""}`, "aria-hidden": "true" },
+    level ? icon(LEVEL[level].icon) : (ini || icon(m.canal === "email" ? "mail" : "message")));
   const status = level ? m.analisis.titulo : (profile?.proteccion_activa ? "Pendiente de revisar" : "Sin revisar");
   return el("li", {},
     el("button", { onclick: () => openMessage(m), "aria-label": `Mensaje de ${m.remitente}. ${status}` },
       badge,
-      el("div", {},
-        el("div", { class: "row" }, el("span", { class: "from" }, m.remitente || "Desconocido"), el("span", { class: "tag" }, CHANNEL[m.canal] || m.canal), el("span", { class: "muted small" }, fmtTime(m.fecha))),
+      el("div", { style: "min-width:0" },
+        el("div", { class: "meta" }, el("span", { class: "from" }, m.remitente || "Desconocido"), el("span", { class: "time" }, fmtShort(m.fecha))),
         el("div", { class: "preview" }, m.texto),
-        el("div", { class: "small", style: `font-weight:700;color:${level ? LEVEL[level].color : "var(--text-soft)"}` }, status))));
+        el("div", { class: "foot" },
+          el("span", { class: `chip-status ${level || ""}` }, level ? LEVEL[level].label : (profile?.proteccion_activa ? "Revisando…" : "Sin revisar")),
+          el("span", { class: "tag" }, CHANNEL[m.canal] || m.canal)))));
 }
 
 function openMessage(m) {
@@ -162,12 +187,15 @@ async function toggleRecording(btn) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     recorder = new MediaRecorder(stream);
     chunks = [];
-    const original = btn.textContent;
+    const label = btn.querySelector(".btn-label");
+    const original = label.textContent;
+    const useEl = btn.querySelector(".ac-icon use, .i use");
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      btn.textContent = original;
-      btn.classList.remove("btn-danger");
+      label.textContent = original;
+      useEl?.setAttribute("href", "/icons.svg#mic");
+      btn.classList.remove("recording");
       const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
       const form = new FormData();
       form.append("canal", "manual");
@@ -176,8 +204,9 @@ async function toggleRecording(btn) {
       runAnalysis(form, { visible: true });
     };
     recorder.start();
-    btn.textContent = "⏹️ Parar y comprobar";
-    btn.classList.add("btn-danger");
+    label.textContent = "Parar y comprobar";
+    useEl?.setAttribute("href", "/icons.svg#stop");
+    btn.classList.add("recording");
     toast("Grabando… lee el mensaje en voz alta");
   } catch (e) {
     toast("No tengo permiso para usar el micrófono");
@@ -192,10 +221,10 @@ function addStep(ev) {
   const prev = list.lastElementChild;
   if (prev && prev.dataset.state === "en_curso") {
     prev.dataset.state = "hecho";
-    prev.querySelector(".st").textContent = "✔️";
+    prev.querySelector(".st").replaceChildren(icon("check"));
   }
-  const icon = ev.estado === "en_curso" ? el("span", { class: "spinner", "aria-hidden": "true" }) : (ev.estado === "aviso" ? "⚠️" : "✔️");
-  list.append(el("li", { "data-state": ev.estado || "hecho" }, el("span", { class: "st" }, icon), el("span", {}, ev.texto)));
+  const mark = ev.estado === "en_curso" ? el("span", { class: "spinner", "aria-hidden": "true" }) : icon(ev.estado === "aviso" ? "alert" : "check");
+  list.append(el("li", { "data-state": ev.estado || "hecho" }, el("span", { class: "st" }, mark), el("span", { class: "txt" }, ev.texto)));
 }
 
 async function runAnalysis(form, { visible }) {
@@ -235,16 +264,17 @@ function verdictCard(result, { compact = false } = {}) {
   const fam = profile?.familiar || {};
   const famName = fam.nombre || "tu familiar";
   const actions = el("div", { class: "actions" + (compact ? "" : " two") });
-  actions.append(el("button", { class: "btn btn-primary", onclick: () => speak(v.mensaje_voz, { voiceId: profile?.voz_id }) }, "🔊 Escuchar"));
+  actions.append(el("button", { class: "btn btn-primary", onclick: () => speak(v.mensaje_voz, { voiceId: profile?.voz_id }) }, icon("volume"), "Escuchar"));
   if ((v.acciones || []).includes("llamar_familiar") && fam.telefono) {
-    actions.append(el("a", { class: "btn btn-ok", href: `tel:${fam.telefono.replace(/\s/g, "")}` }, `📞 Llamar a ${famName}`));
+    actions.append(el("a", { class: "btn btn-ok", href: `tel:${fam.telefono.replace(/\s/g, "")}` }, icon("phone"), `Llamar a ${famName}`));
   }
   if ((v.acciones || []).includes("avisar_familiar") && result.alerta_id) {
     actions.append(el("button", { class: "btn btn-outline", onclick: async (e) => {
-      e.currentTarget.disabled = true;
+      const b = e.currentTarget;
+      b.disabled = true;
       try { await api(`/api/alertas/${result.alerta_id}/avisar`, { method: "POST" }); toast(`Hemos avisado a ${famName}`); }
-      catch (err) { toast("No se ha podido avisar"); e.currentTarget.disabled = false; }
-    } }, `💬 Avisar a ${famName}`));
+      catch (err) { toast("No se ha podido avisar"); b.disabled = false; }
+    } }, icon("message"), `Avisar a ${famName}`));
   }
   if ((v.acciones || []).includes("reportar")) {
     actions.append(el("button", { class: "btn btn-outline", onclick: async (e) => {
@@ -254,28 +284,30 @@ function verdictCard(result, { compact = false } = {}) {
       e.currentTarget.disabled = true;
       await api("/api/reportar", { method: "POST", json: { telefonos, enlaces: ent.enlaces || [] } });
       toast("Gracias. Así protegemos a más personas");
-    } }, "🚩 Reportar como timo"));
+    } }, icon("flag"), "Reportar como timo"));
   }
 
-  const steps = (result.pasos || []);
   const tools = v.herramientas_usadas || [];
-  return el("article", { class: `card verdict ${v.nivel}`, "aria-live": "assertive" },
-    el("div", { class: "icon", "aria-hidden": "true" }, lv.icon),
-    el("h2", { id: compact ? "overlay-title" : "result-title" }, v.titulo),
-    v.tipo_estafa ? el("p", { class: "tag" }, v.tipo_estafa) : null,
-    el("div", { class: "meter", role: "img", "aria-label": `Riesgo ${v.puntuacion} de 100` }, el("span", { style: `width:${v.puntuacion}%;background:${lv.color}` })),
-    el("p", { class: "small muted" }, `Riesgo: ${v.puntuacion}/100`),
+  const evIcon = v.nivel === "verde" ? "check" : v.nivel === "rojo" ? "x" : "alert";
+  const body = el("div", { class: "verdict-body" },
     el("p", {}, v.explicacion),
-    v.pruebas?.length ? el("div", {}, el("h3", {}, "Lo que he comprobado"), el("ul", { class: "evidence" }, v.pruebas.map((p) => el("li", {}, p)))) : null,
-    el("p", { class: "advice" }, "👉 " + v.consejo),
-    result.escudo_activado ? el("div", { class: "banner shield" }, "🛡️ He activado el escudo bancario: tu banco pausará un rato las transferencias a cuentas nuevas.") : null,
+    v.pruebas?.length ? el("div", {}, el("h3", {}, "Lo que he comprobado"), el("ul", { class: "evidence" }, v.pruebas.map((p) => el("li", {}, icon(evIcon), el("span", {}, p))))) : null,
+    el("p", { class: "advice" }, icon("sparkles"), el("span", {}, v.consejo)),
+    result.escudo_activado ? el("div", { class: "banner shield" }, icon("lock"), el("span", {}, "He activado el escudo bancario: tu banco pausará un rato las transferencias a cuentas nuevas.")) : null,
     actions,
     compact ? null : el("details", {},
       el("summary", {}, "Ver cómo lo he investigado"),
       el("p", { class: "small muted" }, `Análisis con ${result.fuente === "ia" ? "IA (" + (v.modelo || "Claude") + ")" : "reglas automáticas"} en ${(result.latencia_ms / 1000).toFixed(1)} s.`),
       tools.length ? el("ul", { class: "small" }, tools.map((t) => el("li", {}, `${t.herramienta}: ${t.resumen}`))) : null,
-      result.texto ? el("p", { class: "small muted" }, "Mensaje analizado: «" + result.texto.slice(0, 400) + "»") : null),
-  );
+      result.texto ? el("p", { class: "small muted" }, "Mensaje analizado: «" + result.texto.slice(0, 400) + "»") : null));
+  return el("article", { class: `card verdict ${v.nivel}`, "aria-live": "assertive" },
+    el("header", { class: "verdict-head" },
+      el("div", { class: "verdict-icon", "aria-hidden": "true" }, icon(lv.icon)),
+      el("h2", { id: compact ? "overlay-title" : "result-title" }, v.titulo),
+      v.tipo_estafa ? el("p", { class: "tag" }, v.tipo_estafa) : null,
+      el("div", { class: "meter", role: "img", "aria-label": `Riesgo ${v.puntuacion} de 100` }, el("span", { style: `width:${v.puntuacion}%` })),
+      el("p", { class: "risk" }, `Riesgo: ${v.puntuacion} de 100`)),
+    body);
 }
 
 function renderResult(result) {
@@ -286,8 +318,8 @@ function renderResult(result) {
 function showOverlay(result) {
   const card = verdictCard(result, { compact: true });
   card.classList.add("sheet");
-  const close = el("button", { class: "btn btn-outline btn-big", onclick: hideOverlay }, "Entendido");
-  card.append(close);
+  const close = el("button", { class: "btn btn-outline btn-big", onclick: hideOverlay }, icon("check"), "Entendido");
+  card.querySelector(".verdict-body").append(close);
   $("#overlay").replaceChildren(card);
   $("#overlay").classList.remove("hidden");
   const title = card.querySelector("h2");
@@ -327,7 +359,7 @@ async function refreshShield() {
     const b = $("#shield-banner");
     if (bank.escudo.activo) {
       const until = new Date(bank.escudo.activo_hasta).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-      b.textContent = `🛡️ Escudo bancario activo hasta las ${until}: las transferencias a cuentas nuevas necesitan el visto bueno de ${profile?.familiar?.nombre || "tu familiar"}.`;
+      b.replaceChildren(icon("lock"), el("span", {}, `Escudo bancario activo hasta las ${until}: las transferencias a cuentas nuevas necesitan el visto bueno de ${profile?.familiar?.nombre || "tu familiar"}.`));
       b.classList.remove("hidden");
     } else b.classList.add("hidden");
   } catch (_) { /* sin banco */ }
@@ -363,7 +395,7 @@ async function init() {
     mensaje: onIncoming,
     perfil: () => loadProfile(),
     escudo: () => refreshShield(),
-    transferencia_retenida: (tx) => toast(`🛡️ Hemos retenido una transferencia de ${tx.importe} € a una cuenta nueva`, 6000),
+    transferencia_retenida: (tx) => toast(`Hemos retenido una transferencia de ${tx.importe} € a una cuenta nueva`, 6000),
     reset: () => location.reload(),
   });
   handleShared();

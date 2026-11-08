@@ -1,9 +1,9 @@
 // Service worker de Centinela: hace la app instalable y que la interfaz cargue sin red.
 // El análisis siempre necesita conexión (no se cachea ninguna llamada a /api).
-const CACHE = "centinela-v1";
+const CACHE = "centinela-v2";
 const SHELL = [
   "/", "/index.html", "/styles.css", "/manifest.webmanifest",
-  "/js/app.js", "/js/common.js", "/icons/icon-192.png", "/icons/icon-512.png",
+  "/js/app.js", "/js/common.js", "/icons.svg", "/icons/icon-192.png", "/icons/icon-512.png",
 ];
 
 self.addEventListener("install", (e) => {
