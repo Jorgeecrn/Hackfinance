@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es" data-letra="grande">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Centinela</title>
+  <meta name="description" content="Te avisa si un mensaje que recibes puede ser una estafa.">
+  <meta name="theme-color" content="#1f4e79">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="sr-only" href="#main">Ir al contenido</a>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Centinela, inicio"><img src="/icons/icon-192.png" alt=""><span class="brand-name">Centinela</span></a>
+      <div class="row">
+        <span id="protection-pill" class="pill" role="status"><span class="dot"></span><span>…</span></span>
+        <button class="btn btn-icon btn-outline" id="btn-settings" aria-label="Ajustes">⚙️</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- INICIO -->
+      <section id="view-home" aria-labelledby="greeting">
+        <h1 id="greeting">Hola</h1>
+        <p class="muted">Te aviso si un mensaje puede ser un timo. Ante la duda, compruébalo aquí.</p>
+        <div id="shield-banner" class="banner shield hidden" role="status"></div>
+        <div class="actions">
+          <button class="btn btn-primary btn-big" id="btn-check">🔍 Comprobar un mensaje</button>
+          <button class="btn btn-big btn-outline" id="btn-record-home">🎙️ Leer el mensaje en voz alta</button>
+        </div>
+        <div class="card">
+          <h2>Mensajes recibidos</h2>
+          <p class="muted small" id="inbox-help">Cuando la protección está activada, reviso solos los mensajes nuevos.</p>
+          <ul class="inbox" id="inbox" aria-live="polite"></ul>
+        </div>
+      </section>
+
+      <!-- COMPROBAR -->
+      <section id="view-check" class="hidden" aria-labelledby="check-title">
+        <h1 id="check-title">Comprobar un mensaje</h1>
+        <div class="card">
+          <label for="check-text">Pega aquí el mensaje que te ha llegado</label>
+          <textarea id="check-text" placeholder="Por ejemplo: «Hola mamá, este es mi número nuevo…»"></textarea>
+          <label for="check-sender">¿Quién lo envía? <span class="muted">(opcional: número o nombre)</span></label>
+          <input id="check-sender" type="text" inputmode="tel" autocomplete="off" placeholder="+34 6..." >
+          <div class="actions two">
+            <label class="btn btn-outline" for="file-image" style="margin:0">📷 Añadir captura</label>
+            <label class="btn btn-outline" for="file-audio" style="margin:0">🎧 Añadir nota de voz</label>
+          </div>
+          <input id="file-image" type="file" accept="image/*" class="sr-only">
+          <input id="file-audio" type="file" accept="audio/*" class="sr-only">
+          <p id="file-chosen" class="muted small" aria-live="polite"></p>
+          <div class="actions">
+            <button class="btn btn-big btn-outline" id="btn-record">🎙️ Grabar: leo el mensaje o pongo el audio</button>
+            <button class="btn btn-primary btn-big" id="btn-analyze">Comprobar ahora</button>
+            <button class="btn btn-outline" data-back>← Volver</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- INVESTIGANDO -->
+      <section id="view-progress" class="hidden" aria-labelledby="progress-title">
+        <h1 id="progress-title">Comprobando…</h1>
+        <div class="card">
+          <ul class="steps" id="steps" aria-live="polite"></ul>
+        </div>
+      </section>
+
+      <!-- RESULTADO -->
+      <section id="view-result" class="hidden" aria-labelledby="result-title">
+        <div id="result"></div>
+        <button class="btn btn-outline btn-big" data-back>← Volver al inicio</button>
+      </section>
+
+      <!-- AJUSTES -->
+      <section id="view-settings" class="hidden" aria-labelledby="settings-title">
+        <h1 id="settings-title">Ajustes</h1>
+        <div class="card">
+          <div class="switch-row">
+            <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa solo los mensajes que te llegan y te avisa si son sospechosos.</span></div>
+            <label class="switch"><input type="checkbox" id="set-proteccion" aria-label="Protección contra estafas"><span class="track"></span></label>
+          </div>
+          <div class="switch-row">
+            <div class="txt"><strong>Leerme los avisos en voz alta</strong><span class="muted small">Con una voz tranquila y clara.</span></div>
+            <label class="switch"><input type="checkbox" id="set-voz" aria-label="Leer los avisos en voz alta"><span class="track"></span></label>
+          </div>
+          <div class="switch-row">
+            <div class="txt"><strong>Escudo bancario</strong><span class="muted small">Si detecto un timo grave, tu banco pausa un rato las transferencias a cuentas nuevas.</span></div>
+            <label class="switch"><input type="checkbox" id="set-escudo" aria-label="Escudo bancario"><span class="track"></span></label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Tus datos</h2>
+          <label for="set-nombre">Tu nombre</label>
+          <input id="set-nombre" type="text" autocomplete="given-name">
+          <label for="set-letra">Tamaño de la letra</label>
+          <select id="set-letra">
+            <option value="normal">Normal</option>
+            <option value="grande">Grande</option>
+            <option value="muy-grande">Muy grande</option>
+          </select>
+        </div>
+        <div class="card">
+          <h2>Familiar de confianza</h2>
+          <p class="muted small">Le avisaré si recibes un timo, y podrás llamarle con un solo botón.</p>
+          <label for="set-fam-nombre">Nombre</label>
+          <input id="set-fam-nombre" type="text">
+          <label for="set-fam-relacion">Parentesco</label>
+          <input id="set-fam-relacion" type="text" placeholder="hija, hijo, nieto…">
+          <label for="set-fam-tel">Teléfono</label>
+          <input id="set-fam-tel" type="tel">
+        </div>
+        <div class="card">
+          <h2>Contactos de confianza</h2>
+          <p class="muted small">Los mensajes de estos números se consideran de confianza.</p>
+          <div class="chip-list" id="contacts"></div>
+          <div class="grid-2" style="margin-top:8px">
+            <div><label for="new-contact-name">Nombre</label><input id="new-contact-name" type="text"></div>
+            <div><label for="new-contact-tel">Teléfono</label><input id="new-contact-tel" type="tel"></div>
+          </div>
+          <label for="new-contact-rel">Parentesco</label>
+          <input id="new-contact-rel" type="text">
+          <div class="actions"><button class="btn btn-outline" id="btn-add-contact">＋ Añadir contacto</button></div>
+        </div>
+        <details class="card">
+          <summary>Opciones avanzadas</summary>
+          <label for="set-voz-id">ID de voz de ElevenLabs (por ejemplo, la voz de tu nieto con su permiso)</label>
+          <input id="set-voz-id" type="text" placeholder="Vacío = voz por defecto">
+          <p class="muted small" id="health"></p>
+        </details>
+        <div class="actions">
+          <button class="btn btn-primary btn-big" id="btn-save-settings">Guardar</button>
+          <button class="btn btn-outline" data-back>← Volver</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Alerta a pantalla completa para mensajes entrantes peligrosos -->
+  <div id="overlay" class="overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="overlay-title">
+    <div class="sheet card" id="overlay-content"></div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

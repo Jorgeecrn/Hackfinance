@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+backend/data/state.json
+backend/data/state.tmp
+backend/data/reports.json
+eval/resultados_*.md
+!eval/resultados_reglas.md
+.DS_Store
+node_modules/

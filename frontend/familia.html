@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel familiar</title>
+  <meta name="theme-color" content="#1f4e79">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app wide">
+    <header class="topbar">
+      <a class="brand" href="/familia.html"><img src="/icons/icon-192.png" alt="">Centinela · Familia</a>
+      <span id="live" class="pill warn" role="status"><span class="dot"></span><span>Conectando…</span></span>
+    </header>
+    <main>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="who">
+          <h2 id="who">Persona protegida</h2>
+          <p class="big-number" id="person">—</p>
+          <div class="row" id="status-pills"></div>
+          <p class="muted small" style="margin-top:10px">Recibirás aquí, al momento, cualquier aviso de posible estafa.</p>
+        </section>
+        <section class="card" aria-labelledby="held-title">
+          <h2 id="held-title">Operaciones retenidas por el escudo</h2>
+          <p class="muted small">Revisa con tu familiar antes de aprobar: si no la reconoce, cancélala.</p>
+          <ul class="feed" id="held"></ul>
+        </section>
+      </div>
+      <section class="card" aria-labelledby="alerts-title">
+        <h2 id="alerts-title">Avisos</h2>
+        <ul class="feed" id="alerts" aria-live="polite"></ul>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/familia.js"></script>
+</body>
+</html>

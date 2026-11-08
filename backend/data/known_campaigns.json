@@ -1,0 +1,249 @@
+{
+  "_nota": "Patrones de campañas de fraude muy repetidas en España, resumidos a partir de los avisos públicos habituales de INCIBE/OSI, Policía Nacional, Guardia Civil y bancos. Son patrones genéricos, no avisos con fecha concreta.",
+  "campanas": [
+    {
+      "id": "hijo_en_apuros",
+      "nombre": "Falso hijo o nieto en apuros (\"Hola mamá, este es mi número nuevo\")",
+      "palabras": [
+        "mama",
+        "papa",
+        "abuela",
+        "abuelo",
+        "numero nuevo",
+        "cambiado de numero",
+        "se me ha roto",
+        "movil roto",
+        "no tengo saldo",
+        "necesito",
+        "urgente",
+        "transferencia",
+        "bizum",
+        "pagar una factura",
+        "no puedo hablar"
+      ],
+      "consejo": "Llama a tu familiar al número de siempre, el que ya tienes guardado. Nunca envíes dinero sin hablar con él de viva voz.",
+      "titulo": "Parece el timo del falso hijo en apuros"
+    },
+    {
+      "id": "banco_cuenta_bloqueada",
+      "nombre": "Falso aviso del banco: cuenta bloqueada o acceso inusual",
+      "palabras": [
+        "banco",
+        "cuenta",
+        "bloqueada",
+        "suspendida",
+        "acceso",
+        "inusual",
+        "verifique",
+        "verificar",
+        "identidad",
+        "enlace",
+        "pulse",
+        "datos",
+        "tarjeta",
+        "seguridad"
+      ],
+      "consejo": "Tu banco nunca te pedirá claves ni datos por SMS o enlace. Entra solo desde la app oficial o llama al número que aparece en tu tarjeta.",
+      "titulo": "Parece un falso aviso de tu banco"
+    },
+    {
+      "id": "paquete_retenido",
+      "nombre": "Paquete retenido: pague una pequeña tasa (Correos, DHL, SEUR...)",
+      "palabras": [
+        "paquete",
+        "envio",
+        "entrega",
+        "retenido",
+        "aduana",
+        "tasa",
+        "pendiente",
+        "direccion",
+        "correos",
+        "dhl",
+        "seur",
+        "gls",
+        "reprogramar",
+        "1,99",
+        "2,99"
+      ],
+      "consejo": "Las empresas de paquetería no piden pagos por SMS. Consulta el envío en la web oficial escribiendo tú la dirección.",
+      "titulo": "Parece el timo del paquete retenido"
+    },
+    {
+      "id": "multa_dgt",
+      "nombre": "Falsa multa de tráfico de la DGT",
+      "palabras": [
+        "dgt",
+        "multa",
+        "sancion",
+        "trafico",
+        "infraccion",
+        "pendiente",
+        "pago",
+        "recargo",
+        "embargo"
+      ],
+      "consejo": "La DGT notifica las multas por correo certificado o por la Dirección Electrónica Vial, no por SMS con enlaces.",
+      "titulo": "Parece una falsa multa de tráfico"
+    },
+    {
+      "id": "hacienda_devolucion",
+      "nombre": "Falsa devolución de Hacienda / Agencia Tributaria",
+      "palabras": [
+        "agencia tributaria",
+        "hacienda",
+        "devolucion",
+        "reembolso",
+        "impuesto",
+        "renta",
+        "aeat",
+        "importe pendiente"
+      ],
+      "consejo": "La Agencia Tributaria no envía enlaces para cobrar devoluciones. Entra en su sede electrónica escribiendo tú la dirección.",
+      "titulo": "Parece una falsa devolución de Hacienda"
+    },
+    {
+      "id": "seguridad_social",
+      "nombre": "Falso aviso de la Seguridad Social (tarjeta sanitaria, pensión)",
+      "palabras": [
+        "seguridad social",
+        "tarjeta sanitaria",
+        "pension",
+        "actualizar",
+        "datos",
+        "caducada"
+      ],
+      "consejo": "La Seguridad Social no pide datos bancarios por SMS ni correo.",
+      "titulo": "Parece un falso aviso de la Seguridad Social"
+    },
+    {
+      "id": "inversion_falsa",
+      "nombre": "Inversión milagro: criptomonedas o rentabilidad garantizada",
+      "palabras": [
+        "inversion",
+        "invertir",
+        "rentabilidad",
+        "garantizada",
+        "cripto",
+        "bitcoin",
+        "beneficio",
+        "duplica",
+        "ganancias",
+        "trading",
+        "broker",
+        "plazas limitadas",
+        "asesor"
+      ],
+      "consejo": "Ninguna inversión real garantiza grandes ganancias. Comprueba en la web de la CNMV si la entidad está registrada.",
+      "titulo": "Parece una inversión milagro falsa"
+    },
+    {
+      "id": "oferta_empleo",
+      "nombre": "Falsa oferta de empleo (likes, reseñas, trabajo desde casa)",
+      "palabras": [
+        "trabajo",
+        "empleo",
+        "desde casa",
+        "al dia",
+        "likes",
+        "resenas",
+        "tareas",
+        "comision",
+        "recursos humanos",
+        "sueldo"
+      ],
+      "consejo": "Si te pagan por dar likes y luego te piden dinero para cobrar, es una estafa.",
+      "titulo": "Parece una falsa oferta de trabajo"
+    },
+    {
+      "id": "premio_sorteo",
+      "nombre": "Premio, sorteo o regalo que no has pedido",
+      "palabras": [
+        "premio",
+        "ganador",
+        "has ganado",
+        "sorteo",
+        "regalo",
+        "gratis",
+        "reclamar",
+        "felicidades",
+        "seleccionado"
+      ],
+      "consejo": "Si no has participado en ningún sorteo, no puedes haberlo ganado. No pagues gastos de envío ni des datos.",
+      "titulo": "Parece el timo del falso premio"
+    },
+    {
+      "id": "bizum_inverso",
+      "nombre": "Bizum inverso: te piden dinero haciéndose pasar por un pago",
+      "palabras": [
+        "bizum",
+        "solicitud",
+        "aceptar",
+        "recibir",
+        "por error",
+        "devuelve",
+        "devolver",
+        "wallapop",
+        "vinted",
+        "comprador"
+      ],
+      "consejo": "Para recibir un Bizum no tienes que aceptar nada. Si la app te pide confirmar un pago, estás enviando dinero.",
+      "titulo": "Parece el timo del Bizum inverso"
+    },
+    {
+      "id": "suministros_factura",
+      "nombre": "Falsa factura o corte de luz/gas/teléfono",
+      "palabras": [
+        "factura",
+        "impagada",
+        "corte",
+        "suministro",
+        "luz",
+        "gas",
+        "endesa",
+        "iberdrola",
+        "naturgy",
+        "reembolso",
+        "cobro duplicado"
+      ],
+      "consejo": "Consulta tus facturas en el área de cliente oficial. Las compañías no cortan el suministro por SMS.",
+      "titulo": "Parece una falsa factura de luz o gas"
+    },
+    {
+      "id": "suscripcion_caducada",
+      "nombre": "Suscripción caducada (Netflix, Amazon, Apple...)",
+      "palabras": [
+        "suscripcion",
+        "caducada",
+        "netflix",
+        "amazon",
+        "prime",
+        "apple",
+        "pago rechazado",
+        "actualizar metodo de pago",
+        "membresia"
+      ],
+      "consejo": "Entra en la app oficial del servicio para comprobar tu suscripción. No uses el enlace del mensaje.",
+      "titulo": "Parece un falso aviso de suscripción"
+    },
+    {
+      "id": "falso_tecnico",
+      "nombre": "Falso servicio técnico o falso agente que pide instalar una app",
+      "palabras": [
+        "tecnico",
+        "soporte",
+        "virus",
+        "instale",
+        "instalar",
+        "anydesk",
+        "teamviewer",
+        "acceso remoto",
+        "codigo",
+        "agente",
+        "departamento de fraude"
+      ],
+      "consejo": "Nunca instales aplicaciones de control remoto a petición de alguien que te contacta. Cuelga y llama tú al número oficial.",
+      "titulo": "Parece el timo del falso técnico"
+    }
+  ]
+}

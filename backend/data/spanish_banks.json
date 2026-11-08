@@ -1,0 +1,22 @@
+{
+  "_nota": "Códigos de entidad (posiciones 5-8 del IBAN español) de algunas entidades habituales.",
+  "entidades": {
+    "0049": "Banco Santander",
+    "0030": "Banco Santander",
+    "0182": "BBVA",
+    "2100": "CaixaBank",
+    "0081": "Banco Sabadell",
+    "1465": "ING",
+    "0128": "Bankinter",
+    "0073": "Openbank",
+    "2103": "Unicaja",
+    "2080": "Abanca",
+    "2095": "Kutxabank",
+    "2085": "Ibercaja",
+    "3058": "Cajamar",
+    "0239": "EVO Banco",
+    "0019": "Deutsche Bank",
+    "0487": "Banco Mare Nostrum",
+    "1544": "Andbank España (MyInvestor)"
+  }
+}

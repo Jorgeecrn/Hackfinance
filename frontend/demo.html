@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de la demo</title>
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app wide">
+    <header class="topbar">
+      <a class="brand" href="/demo.html"><img src="/icons/icon-192.png" alt="">Control de la demo</a>
+      <div class="row">
+        <a class="btn btn-small btn-outline" href="/" target="_blank">📱 App</a>
+        <a class="btn btn-small btn-outline" href="/familia.html" target="_blank">👪 Familia</a>
+        <a class="btn btn-small btn-outline" href="/banco.html" target="_blank">🏦 Banco</a>
+      </div>
+    </header>
+    <main>
+      <p class="muted" id="health">Comprobando servicios…</p>
+      <section class="card" aria-labelledby="custom-title">
+        <h2 id="custom-title">Enviar un mensaje al móvil</h2>
+        <p class="muted small">Simula que al móvil de la persona protegida le llega un SMS o WhatsApp. Si tiene la protección activada, se analiza solo.</p>
+        <div class="grid-2">
+          <div><label for="c-sender">Remitente</label><input id="c-sender" type="text" placeholder="+34 711 23 45 67"></div>
+          <div><label for="c-channel">Canal</label>
+            <select id="c-channel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Correo</option></select></div>
+        </div>
+        <label for="c-text">Texto</label>
+        <textarea id="c-text"></textarea>
+        <div class="actions"><button class="btn btn-primary" id="btn-send">📨 Enviar al móvil</button></div>
+      </section>
+      <section class="card" aria-labelledby="samples-title">
+        <h2 id="samples-title">Mensajes de ejemplo</h2>
+        <div style="overflow-x:auto"><table><thead><tr><th>Ejemplo</th><th>Tipo</th><th>Remitente</th><th></th></tr></thead><tbody id="samples"></tbody></table></div>
+      </section>
+      <div class="actions"><button class="btn btn-outline" id="btn-reset">↺ Reiniciar la demo (borra mensajes, alertas y banco)</button></div>
+    </main>
+  </div>
+  <script type="module" src="/js/demo.js"></script>
+</body>
+</html>

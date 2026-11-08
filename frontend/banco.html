@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banco simulado</title>
+  <meta name="theme-color" content="#1f4e79">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app wide">
+    <header class="topbar">
+      <a class="brand" href="/banco.html"><img src="/icons/icon-192.png" alt="">Banco simulado · Escudo</a>
+      <span class="tag">Demo: integración bancaria</span>
+    </header>
+    <main>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="acc">
+          <h2 id="acc">Cuenta</h2>
+          <p class="muted" id="entity">—</p>
+          <p class="big-number" id="balance">—</p>
+          <p class="small muted" id="iban">—</p>
+        </section>
+        <section class="card" aria-labelledby="shield-title">
+          <h2 id="shield-title">Escudo bancario</h2>
+          <p id="shield-status" class="banner info">—</p>
+          <div class="row">
+            <button class="btn btn-outline btn-small" id="btn-shield-on">Activar 60 min</button>
+            <button class="btn btn-outline btn-small" id="btn-shield-off">Desactivar</button>
+          </div>
+        </section>
+      </div>
+      <section class="card" aria-labelledby="tx-title">
+        <h2 id="tx-title">Simular una transferencia o Bizum</h2>
+        <p class="muted small">Así se ve lo que pasaría si la persona intenta pagar al estafador después del aviso.</p>
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn btn-small btn-outline" id="preset-scam">Preset: pagar al «hijo» (680 €)</button>
+          <button class="btn btn-small btn-outline" id="preset-ok">Preset: pagar a Lucía (25 €)</button>
+        </div>
+        <div class="grid-2">
+          <div><label for="tx-benef">Beneficiario</label><input id="tx-benef" type="text"></div>
+          <div><label for="tx-iban">IBAN</label><input id="tx-iban" type="text"></div>
+          <div><label for="tx-amount">Importe (€)</label><input id="tx-amount" type="number" min="1" step="0.01"></div>
+          <div><label for="tx-concept">Concepto</label><input id="tx-concept" type="text"></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" id="btn-send">Enviar</button></div>
+      </section>
+      <section class="card" aria-labelledby="mov-title">
+        <h2 id="mov-title">Movimientos</h2>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Fecha</th><th>Beneficiario</th><th>Importe</th><th>Estado</th><th>Detalle</th></tr></thead>
+            <tbody id="movements"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/banco.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[
+  {"titulo": "Falso hijo con número nuevo", "tipo": "estafa", "canal": "whatsapp", "remitente": "+34 711 23 45 67",
+   "texto": "Hola mamá, se me ha caído el móvil al agua y este es mi número nuevo, guárdalo. Ahora no puedo hablar, el micro no funciona. Tengo que pagar una factura urgente hoy y no me deja el banco desde el móvil nuevo, ¿me puedes hacer un Bizum de 680€? Te lo devuelvo mañana. No le digas nada a papá que se preocupa."},
+  {"titulo": "Falso MyInvestor: cuenta bloqueada", "tipo": "estafa", "canal": "sms", "remitente": "MyInvestor",
+   "texto": "MyInvestor: Hemos detectado un acceso inusual y su cuenta ha sido BLOQUEADA temporalmente. Para evitar la cancelación verifique sus datos en las próximas 24h: https://myinvestor-verificacion.com/acceso"},
+  {"titulo": "Paquete retenido (Correos)", "tipo": "estafa", "canal": "sms", "remitente": "+44 7700 900123",
+   "texto": "Correos: Su paquete ES2849301 está retenido por tasas de aduana pendientes (1,99 EUR). Pague antes de 48h o será devuelto: correos-es.envios-track.top/pago"},
+  {"titulo": "Multa de la DGT", "tipo": "estafa", "canal": "sms", "remitente": "DGT",
+   "texto": "DGT: Tiene una multa de tráfico pendiente de pago. Evite el recargo del 50% y el embargo abonando la sanción hoy en dgt-multas.info/pagar"},
+  {"titulo": "Inversión milagro en cripto", "tipo": "estafa", "canal": "whatsapp", "remitente": "+371 2012 3456",
+   "texto": "Buenas Carmen, soy Laura, asesora de inversión. Con nuestro programa de trading en bitcoin obtenga una rentabilidad garantizada del 30% mensual, sin riesgo. Plazas limitadas: ingrese 250€ en la cuenta LT60 3250 0233 4567 8901 para empezar."},
+  {"titulo": "Falso técnico del banco", "tipo": "estafa", "canal": "sms", "remitente": "+34 911 23 45 67",
+   "texto": "Departamento de fraude de su banco: se ha intentado un cargo de 1.249€. Si no lo reconoce, un agente le llamará. Instale la app AnyDesk para que podamos bloquearlo y facilítenos el código que le llegará por SMS."},
+  {"titulo": "Código real de verificación", "tipo": "legitimo", "canal": "sms", "remitente": "MyInvestor",
+   "texto": "Tu código de verificación de MyInvestor es 482913. No compartas este código con nadie. MyInvestor nunca te lo pedirá por teléfono."},
+  {"titulo": "Lucía de verdad (contacto guardado)", "tipo": "legitimo", "canal": "whatsapp", "remitente": "+34 600 111 222",
+   "texto": "Hola mamá! El domingo vamos a comer los niños y yo, ¿te parece bien a las dos? Llevo yo el postre 😘"},
+  {"titulo": "Cita del centro de salud", "tipo": "legitimo", "canal": "sms", "remitente": "+34 915 555 555",
+   "texto": "Centro de Salud: le recordamos su cita con el médico de familia el martes 12 a las 10:30. Si no puede acudir, llame al centro para anularla."},
+  {"titulo": "Javier pide un Bizum para la cena", "tipo": "legitimo", "canal": "whatsapp", "remitente": "+34 600 333 444",
+   "texto": "Mamá, te he pagado yo la cena de cumpleaños de la abuela, cuando puedas hazme un Bizum de 25€ y así lo dividimos entre todos. Un beso!"}
+]
