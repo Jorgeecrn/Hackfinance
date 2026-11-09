@@ -16,6 +16,7 @@ from . import bank, elevenlabs, state as st, tools
 from .analyzer import analyze, analyze_stream, notify_family
 from .config import DATA_DIR, FRONTEND_DIR, settings
 from .events import bus, sse_format
+from .llamada.router import router as llamada_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("centinela")
@@ -322,4 +323,5 @@ def service_worker():
     return FileResponse(FRONTEND_DIR / "sw.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
+app.include_router(llamada_router)  # Escudo de llamada (Banco Demo)
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

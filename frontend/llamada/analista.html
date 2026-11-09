@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Analista · Escudo</title>
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/llamada/llamada.css">
+</head>
+<body>
+  <div class="ll-panel">
+    <header class="topbar">
+      <a class="brand" href="/llamada/analista.html">
+        <span class="logo"><svg class="i"><use href="/icons.svg#bank"/></svg></span>
+        <span>Banco Demo <small>· Panel del analista de fraude</small></span>
+      </a>
+      <span class="tag">Se actualiza cada 2 s</span>
+    </header>
+    <main class="ll-cases-layout">
+      <section class="card">
+        <h2>Casos</h2>
+        <div class="ll-table-wrap">
+          <table class="ll-table">
+            <thead><tr><th>Estado</th><th>Importe</th><th>Beneficiario</th><th>Riesgo</th><th>Tipo</th></tr></thead>
+            <tbody id="cases"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="empty">Todavía no hay casos. Las transferencias normales no generan caso.</p>
+      </section>
+      <section class="card ll-detail" id="detail" aria-live="polite">
+        <p class="muted">Selecciona un caso para ver su detalle.</p>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/llamada/analista.js"></script>
+</body>
+</html>

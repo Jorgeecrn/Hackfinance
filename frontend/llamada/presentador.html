@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presentador · Escudo</title>
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/llamada/llamada.css">
+</head>
+<body>
+  <div class="ll-panel">
+    <header class="topbar">
+      <a class="brand" href="/llamada/presentador.html">
+        <span class="logo"><svg class="i"><use href="/icons.svg#sliders"/></svg></span>
+        <span>Panel del presentador <small>· Escudo de llamada</small></span>
+      </a>
+      <span class="tag" id="model">—</span>
+    </header>
+    <main class="ll-screen">
+      <div class="ll-warn hidden" id="no-key">Falta ANTHROPIC_API_KEY: las transferencias arriesgadas irán al analista sin conversación.</div>
+
+      <section class="card">
+        <div class="ll-big-switch" id="call-box">
+          <div><strong>Llamada activa</strong><br><span class="muted small">Simula la señal del móvil «hay una llamada en curso». Nunca se escucha la llamada.</span></div>
+          <button class="btn btn-primary" id="call-toggle" aria-pressed="false"><svg class="i"><use href="/icons.svg#phone"/></svg> <span>Activar</span></button>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn btn-outline btn-small" id="reset"><svg class="i"><use href="/icons.svg#rotate"/></svg> Reiniciar demo</button>
+          <span class="muted small" id="reset-msg"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Guion</h2>
+        <ol class="ll-steps">
+          <li><strong>Escenario 1 · normal:</strong> sin llamada, 200 € a Javier → se envía al instante, el agente no aparece.</li>
+          <li><strong>Escenario 3 · estafa:</strong> activa la llamada; la víctima traspasa 8.000 € del ahorro y envía 8.500 € a un IBAN pegado → el Escudo pregunta y la retiene.</li>
+          <li><strong>Analista:</strong> puntuación, señales, conversación y decisión; bloquear.</li>
+          <li><strong>Escenario 2 · casero:</strong> llamada activa, 600 € al casero → una o dos preguntas y se envía.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Pantallas</h2>
+        <div class="ll-links">
+          <a class="btn btn-outline btn-small" href="/llamada/" target="_blank"><svg class="i"><use href="/icons.svg#smartphone"/></svg> App de la clienta</a>
+          <a class="btn btn-outline btn-small" href="/llamada/analista.html" target="_blank"><svg class="i"><use href="/icons.svg#bank"/></svg> Panel del analista</a>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/llamada/presentador.js"></script>
+</body>
+</html>

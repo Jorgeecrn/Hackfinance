@@ -128,10 +128,47 @@ Cada ejecución escribe un informe en `eval/resultados_<modo>.md` con precisión
 6. En el móvil: «Comprobar un mensaje» → «Grabar» y lee un mensaje en voz alta, o sube una nota de voz.
 7. Cierra con la tabla de métricas de `eval/resultados_ia.md`.
 
+## 🛡️ Escudo de llamada (Banco Demo)
+
+Una segunda demo, independiente del resto de Centinela, para la estafa del **falso empleado del banco**: alguien llama a la víctima y la guía para que ella misma transfiera su dinero a una «cuenta segura». En esta estafa todo es legítimo (el móvil, la huella y el código son del cliente), así que los sistemas antifraude clásicos no la ven.
+
+**Cómo funciona:** cuando una transferencia parece arriesgada, el banco la pone en pausa y un agente de Claude (`claude-haiku-5-5`) mantiene una conversación corta con el cliente, pensada para romper el guion del estafador, antes de ejecutarla.
+
+- **Embudo:** un motor de reglas puntúa el 100 % de las transferencias (llamada activa, beneficiario nuevo, importe inusual, traspaso previo desde el ahorro, cuenta marcada, IBAN pegado). El agente solo entra a partir de 40 puntos.
+- **El LLM no decide solo:** devuelve una evaluación estructurada (tipo de estafa, riesgo, alertas) y una política determinista decide entre **ejecutar**, **retener** o **enviar a un analista**. Cada decisión guarda la regla aplicada y sus motivos.
+- **Ante fallo, seguridad:** si el agente no responde o falta la clave, la transferencia arriesgada no se ejecuta y pasa al analista.
+- **Privacidad:** no se escuchan las llamadas. Solo se usa la señal «hay una llamada en curso» (en la demo, un interruptor en el panel del presentador).
+
+Pantallas (con el servidor en marcha):
+- **http://localhost:8000/llamada/** → app de la clienta, Carmen López (aspecto de móvil)
+- **http://localhost:8000/llamada/presentador.html** → llamada simulada, reinicio de la demo y aviso si falta la clave
+- **http://localhost:8000/llamada/analista.html** → casos con puntuación, señales, conversación y botones Liberar / Bloquear
+
+### Guion de la demo (unos 4 minutos)
+
+1. **Contexto (30 s):** el problema y la solución en una frase.
+2. **Escenario 1 (20 s):** 200 € a Javier sin llamada → se envía al instante; el agente no aparece.
+3. **Escenario 3 (2 min):** un compañero llama a la «víctima» y la guía. El presentador activa «Llamada activa». La víctima traspasa 8.000 € del ahorro y envía 8.500 € a un IBAN pegado. El Escudo pregunta y **retiene** la transferencia.
+4. **Panel del analista (40 s):** puntuación, señales, tipo de estafa, conversación y decisión.
+5. **Escenario 2 (20 s):** llamada activa, 600 € al casero → una o dos preguntas y se envía.
+6. **Cierre (30 s):** coste (céntimos por intervención, solo en una fracción mínima de transferencias), privacidad y hoja de ruta.
+
+En la pantalla de transferencia hay accesos «Demo: rellenar escenario 1 · 2 · 3».
+
+### Evaluación con el modelo real
+
+```bash
+python eval/run_llamada_eval.py --veces 3
+```
+
+Repite cada guion varias veces y comprueba que el escenario 3 termina siempre retenido y el 2 ejecutado. Los tests (`backend/tests/test_llamada_*.py`) no necesitan red ni claves.
+
 ## Estructura del repositorio
 
 ```
 backend/app/        API, agente, reglas, herramientas, ElevenLabs, banco simulado
+backend/app/llamada/  escudo de llamada: riesgo, agente, política, API del Banco Demo
+frontend/llamada/   app de la clienta, presentador y analista del escudo de llamada
 backend/data/       dominios oficiales, campañas conocidas, bancos españoles, ejemplos de demo
 backend/tests/      tests (pytest)
 frontend/           PWA (index, familia, banco, demo), service worker, manifest, iconos
