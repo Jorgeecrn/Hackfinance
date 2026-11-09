@@ -157,6 +157,30 @@ def test_agent_failure_mid_conversation_goes_to_review(fake_agent):
     assert out["outcome"]["action"] == "review" and cases()[0]["status"] == "pendiente"
 
 
+def test_unexpected_agent_error_goes_to_review(monkeypatch):
+    async def boom(*args, **kwargs):
+        raise KeyError("respuesta inesperada")
+
+    monkeypatch.setattr(agent, "next_turn", boom)
+    r = transfer("casero", call=True)
+    assert r.status_code == 200 and r.json()["outcome"]["action"] == "review"
+    case = cases()[0]
+    assert case["status"] == "pendiente" and case["awaiting"] is False
+
+
+def test_unexpected_agent_error_mid_conversation_goes_to_review(fake_agent, monkeypatch):
+    fake_agent([A("low")])
+    r = transfer("casero", call=True).json()
+
+    async def boom(*args, **kwargs):
+        raise AttributeError("sin content")
+
+    monkeypatch.setattr(agent, "next_turn", boom)
+    out = reply(r["conversationId"])
+    assert out.status_code == 200 and out.json()["outcome"]["action"] == "review"
+    assert cases()[0]["status"] == "pendiente"
+
+
 def test_insufficient_balance_rejected_before_risk(fake_agent):
     calls = fake_agent([])
     r = transfer("casero", call=True, amount=5000)

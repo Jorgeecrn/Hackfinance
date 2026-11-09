@@ -127,7 +127,10 @@ $("#form-reply").addEventListener("submit", async (e) => {
   try {
     handleView(await api(`${BASE}/conversations/${conversationId}/messages`, { method: "POST", json: { text } }));
   } catch (err) {
+    // La conversación ya no existe o ya se decidió (p. ej., la demo se reinició): volver al inicio.
     toast(err.message);
+    show("scr-home");
+    refresh();
   } finally {
     typing.remove();
     btn.disabled = false;

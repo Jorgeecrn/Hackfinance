@@ -6,6 +6,7 @@ transferencia arriesgada no se ejecuta y pasa a un analista.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -16,7 +17,9 @@ from .seed import FLAGGED_IBANS
 from .policy import CLOSING_TEXTS, decide, hard_rule_applies
 from .risk import THRESHOLD, evaluate_risk, normalize_iban
 
-STATUS_BY_ACTION = {"execute": "ejecutada", "hold": "retenida", "review": "pendiente"}
+log = logging.getLogger("centinela.llamada")
+
+STATUS_BY_ACTION ={"execute": "ejecutada", "hold": "retenida", "review": "pendiente"}
 OPEN_FOR_ANALYST = {"retenida", "pendiente"}
 
 
@@ -128,6 +131,9 @@ async def _ask_agent(case: dict) -> dict | None:
     try:
         return await agent.next_turn(*_agent_input(case))
     except agent.AgentUnavailable:
+        return None
+    except Exception:  # cualquier fallo inesperado → analista, nunca un caso huérfano
+        log.exception("Error inesperado del agente del escudo")
         return None
 
 
