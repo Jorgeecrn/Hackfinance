@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es" data-letra="normal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banco Demo</title>
+  <meta name="theme-color" content="#1d4f91">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/llamada/llamada.css">
+</head>
+<body>
+  <div class="ll-phone">
+    <header class="ll-head">
+      <div><strong>Banco Demo</strong><br><small id="client-name">—</small></div>
+      <svg class="i" aria-hidden="true"><use href="/icons.svg#bank"/></svg>
+    </header>
+    <div class="ll-call hidden" id="call-banner" role="status"><span class="dot"></span> Llamada en curso</div>
+
+    <main class="ll-body">
+      <!-- Inicio -->
+      <section class="ll-screen" id="scr-home">
+        <div class="ll-acc main"><span class="label">Cuenta corriente</span><span class="amount" id="bal-corriente">—</span></div>
+        <div class="ll-acc"><span class="label">Cuenta de ahorro</span><span class="amount" id="bal-ahorro">—</span></div>
+        <div class="ll-actions">
+          <button class="btn btn-outline" id="go-internal"><svg class="i"><use href="/icons.svg#rotate"/></svg> Traspasar desde ahorro</button>
+          <button class="btn btn-primary" id="go-transfer"><svg class="i"><use href="/icons.svg#send"/></svg> Nueva transferencia</button>
+        </div>
+        <h2 class="small muted" style="margin:6px 0 0">Movimientos</h2>
+        <ul class="ll-movs" id="movements"></ul>
+      </section>
+
+      <!-- Traspaso -->
+      <section class="ll-screen hidden" id="scr-internal">
+        <button class="btn btn-ghost btn-small ll-back" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+        <h2>Traspaso a la cuenta corriente</h2>
+        <p class="muted small">Desde tu cuenta de ahorro.</p>
+        <form id="form-internal">
+          <label for="int-amount">Importe (€)</label>
+          <input id="int-amount" type="number" min="0.01" step="0.01" required>
+          <div class="actions"><button class="btn btn-primary btn-big" type="submit">Traspasar</button></div>
+        </form>
+      </section>
+
+      <!-- Transferencia -->
+      <section class="ll-screen hidden" id="scr-transfer">
+        <button class="btn btn-ghost btn-small ll-back" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+        <h2>Nueva transferencia</h2>
+        <form id="form-transfer">
+          <label for="tx-name">Beneficiario</label>
+          <input id="tx-name" type="text" maxlength="80" required autocomplete="off">
+          <label for="tx-iban">IBAN</label>
+          <input id="tx-iban" type="text" maxlength="42" required autocomplete="off" placeholder="ES00 0000 0000 0000 0000 0000">
+          <label for="tx-amount">Importe (€)</label>
+          <input id="tx-amount" type="number" min="0.01" step="0.01" required>
+          <label for="tx-concept">Concepto</label>
+          <input id="tx-concept" type="text" maxlength="140" autocomplete="off">
+          <div class="actions"><button class="btn btn-primary btn-big" type="submit" id="tx-send">Enviar</button></div>
+        </form>
+        <div class="ll-demo">Demo: rellenar escenario
+          <button type="button" data-preset="normal">1</button>
+          <button type="button" data-preset="casero">2</button>
+          <button type="button" data-preset="estafa">3</button>
+        </div>
+      </section>
+
+      <!-- Chat del Escudo -->
+      <section class="ll-screen hidden" id="scr-chat">
+        <div class="ll-shield-head">
+          <svg class="i" aria-hidden="true"><use href="/icons.svg#shield"/></svg>
+          <div><strong>Escudo de Banco Demo</strong><br><span class="small muted">Tu transferencia está en pausa un momento</span></div>
+        </div>
+        <div class="ll-chat" id="chat" aria-live="polite"></div>
+        <form class="ll-reply" id="form-reply">
+          <input id="reply-text" type="text" maxlength="500" placeholder="Escribe tu respuesta" autocomplete="off" required>
+          <button class="btn btn-primary btn-small" id="reply-send" type="submit">Responder</button>
+        </form>
+      </section>
+
+      <!-- Resultado -->
+      <section class="ll-screen hidden" id="scr-result">
+        <div class="ll-result" id="result">
+          <div class="ring"><svg class="i" aria-hidden="true"><use id="result-icon" href="/icons.svg#check-circle"/></svg></div>
+          <p id="result-text"></p>
+          <button class="btn btn-outline" data-back>Volver al inicio</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/js/llamada/cliente.js"></script>
+</body>
+</html>
