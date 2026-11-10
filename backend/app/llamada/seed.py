@@ -7,6 +7,7 @@ from __future__ import annotations
 JAVIER_IBAN = "ES6621000418401234567891"
 CASERO_IBAN = "ES6201822370420201504358"
 ESTAFA_IBAN = "ES4920383000001000123456"
+LUCIA_IBAN = "ES9121000418450200051332"
 
 # Cuentas que el banco ya tiene marcadas como sospechosas (mulas).
 FLAGGED_IBANS = ["ES9814650100941900123456"]
@@ -23,7 +24,7 @@ SEED: dict = {
         "corriente": {"iban": "ES6000491500051234567892", "balance": 2300.0},
         "ahorro": {"balance": 14000.0},
     },
-    "beneficiaries": [{"name": "Javier López", "iban": JAVIER_IBAN}],
+    "beneficiaries": [{"name": "Javier López", "iban": JAVIER_IBAN}, {"name": "Lucía López", "iban": LUCIA_IBAN}],
     # Historial: media de salidas = 250 €
     "movements": [
         _out(350.0, "2026-10-28T10:00:00+00:00"),

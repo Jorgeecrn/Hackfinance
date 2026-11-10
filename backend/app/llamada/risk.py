@@ -17,6 +17,7 @@ WEIGHTS: dict[str, int] = {
     "importe_inusual": 20,
     "traspaso_previo_ahorro": 20,
     "cuenta_destino_marcada": 25,
+    "alerta_estafa_reciente": 25,
     "iban_pegado": 10,
 }
 
@@ -34,7 +35,7 @@ def eur(n: float) -> str:
 
 def evaluate_risk(amount: float, iban: str, call_active: bool, iban_pasted: bool,
                   beneficiaries: list[dict], movements: list[dict], flagged: list[str],
-                  now: datetime) -> dict:
+                  now: datetime, recent_alert: str | None = None) -> dict:
     target = normalize_iban(iban)
     hits: dict[str, str] = {}
 
@@ -61,6 +62,9 @@ def evaluate_risk(amount: float, iban: str, call_active: bool, iban_pasted: bool
 
     if target in {normalize_iban(f) for f in flagged}:
         hits["cuenta_destino_marcada"] = "La cuenta de destino está marcada como sospechosa"
+
+    if recent_alert:
+        hits["alerta_estafa_reciente"] = recent_alert
 
     if iban_pasted:
         hits["iban_pegado"] = "El número de cuenta se pegó en lugar de escribirse"
