@@ -1,4 +1,4 @@
-// Panel del familiar de confianza: avisos en tiempo real y aprobación de operaciones retenidas.
+// Panel del familiar de confianza: avisos en tiempo real y revisión de las transferencias de Banco Demo.
 import { api, subscribe, el, toast, LEVEL, fmtTime, fmtMoney, CHANNEL, icon, initials } from "./common.js";
 
 const $ = (s) => document.querySelector(s);
@@ -23,36 +23,55 @@ async function loadProfile() {
     el("span", { class: "pill " + (p.proteccion_activa ? "on" : "off") }, el("span", { class: "dot" }), p.proteccion_activa ? "Protección activada" : "Protección desactivada"),
     el("span", { class: "pill " + (bank.escudo.activo ? "warn" : "") }, icon(bank.escudo.activo ? "lock" : "shield"), bank.escudo.activo ? "Escudo bancario activo" : "Escudo en espera"),
   );
-  held = bank.transferencias.filter((t) => t.estado === "retenida");
+}
+
+// ------------------------------------------------------------ transferencias de Banco Demo en revisión
+const OPEN = ["retenida", "pendiente"];
+const STATUS_LABEL = { retenida: "Retenida", pendiente: "Pendiente" };
+
+async function loadCases() {
+  try {
+    const cases = await api("/api/llamada/cases");
+    held = cases.filter((c) => OPEN.includes(c.status));
+  } catch (e) { console.warn(e); }
   renderHeld();
   renderStats();
+}
+
+function topSignal(c) {
+  const sorted = [...(c.signals || [])].sort((a, b) => b.weight - a.weight);
+  return sorted[0]?.detail || "";
 }
 
 function renderHeld() {
   const ul = $("#held");
   if (!held.length) {
-    ul.replaceChildren(el("li", { class: "empty" }, icon("check-circle"), "No hay operaciones retenidas."));
+    ul.replaceChildren(el("li", { class: "empty" }, icon("check-circle"), "No hay transferencias en revisión."));
     return;
   }
-  ul.replaceChildren(...held.map((tx) => el("li", { style: "border:0;padding:0" },
+  ul.replaceChildren(...held.map((c) => el("li", { style: "border:0;padding:0" },
     el("div", { class: "held" },
       el("div", { class: "row", style: "justify-content:space-between;align-items:flex-start" },
         el("div", {},
-          el("div", { class: "amount" }, fmtMoney(tx.importe)),
-          el("div", { class: "who" }, `a ${tx.beneficiario}`)),
-        el("span", { class: "estado retenida" }, icon("clock"), "Retenida")),
-      el("div", { class: "small muted", style: "margin-top:6px" }, `${tx.iban} · ${tx.concepto || "sin concepto"} · ${fmtTime(tx.fecha)}`),
+          el("div", { class: "amount" }, fmtMoney(c.amount)),
+          el("div", { class: "who" }, `a ${c.beneficiaryName}`)),
+        el("span", { class: "estado retenida" }, icon("clock"), STATUS_LABEL[c.status] || c.status)),
+      el("div", { class: "small muted", style: "margin-top:6px" }, `${c.iban} · ${c.concept || "sin concepto"} · ${fmtTime(c.createdAt)}`),
+      topSignal(c) ? el("p", { class: "small", style: "margin:8px 0 0" }, icon("alert"), " ", topSignal(c)) : null,
+      (c.transcript || []).length ? el("details", {},
+        el("summary", {}, "Ver la conversación con el banco"),
+        ...c.transcript.map((t) => el("p", { class: "small" }, el("strong", {}, t.role === "agent" ? "Banco: " : "Ella: "), t.text))) : null,
       el("div", { class: "btns" },
-        el("button", { class: "btn btn-danger", onclick: () => resolve(tx.id, "cancelar") }, icon("x"), "Cancelar"),
-        el("button", { class: "btn btn-outline", onclick: () => resolve(tx.id, "aprobar") }, icon("check"), "Aprobar"))))));
+        el("button", { class: "btn btn-danger", onclick: () => resolve(c.id, "block") }, icon("x"), "Bloquear"),
+        el("button", { class: "btn btn-outline", onclick: () => resolve(c.id, "release") }, icon("check"), "Liberar"))))));
 }
 
-async function resolve(id, action) {
+async function resolve(id, decision) {
   try {
-    await api(`/api/banco/transferencias/${id}/${action}`, { method: "POST" });
-    toast(action === "cancelar" ? "Operación cancelada: el dinero no ha salido" : "Operación aprobada");
-    loadProfile();
+    await api(`/api/llamada/cases/${id}/decision`, { method: "POST", json: { decision, actor: "familia" } });
+    toast(decision === "block" ? "Transferencia bloqueada: el dinero no ha salido" : "Transferencia liberada");
   } catch (e) { toast(e.message); }
+  loadCases();
 }
 
 function alertItem(a, flash = false) {
@@ -89,7 +108,7 @@ async function init() {
   if ("Notification" in window && Notification.permission === "default") {
     document.body.addEventListener("click", () => Notification.requestPermission(), { once: true });
   }
-  await Promise.all([loadProfile(), loadAlerts()]);
+  await Promise.all([loadProfile(), loadAlerts(), loadCases()]);
   const es = subscribe("familia", {
     alerta: (a) => {
       alerts = [a, ...alerts.filter((x) => x.id !== a.id)];
@@ -103,12 +122,13 @@ async function init() {
       notifyBrowser("Centinela: posible estafa", a.titulo);
       loadAlerts();
     },
-    transferencia_retenida: (tx) => {
-      toast(`Operación de ${fmtMoney(tx.importe)} retenida: revísala`, 6000);
-      notifyBrowser("Centinela: operación retenida", `${fmtMoney(tx.importe)} a ${tx.beneficiario}`);
-      loadProfile();
+    caso: (c) => {
+      if (OPEN.includes(c.status)) {
+        toast(`Transferencia de ${fmtMoney(c.amount)} en revisión: decide si liberarla`, 6000);
+        notifyBrowser("Banco Demo: transferencia en revisión", `${fmtMoney(c.amount)} a ${c.beneficiaryName}`);
+      }
+      loadCases();
     },
-    transferencia: () => loadProfile(),
     escudo: () => loadProfile(),
     perfil: () => loadProfile(),
     reset: () => location.reload(),

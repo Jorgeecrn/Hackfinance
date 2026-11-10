@@ -55,3 +55,10 @@ def test_share_target_redirects_to_app():
     r = client.post("/share-target", data={"text": "hola"}, follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"].startswith("/?compartido=")
+
+
+def test_family_panel_uses_bank_cases():
+    js = client.get("/js/familia.js").text
+    assert "/api/llamada/cases" in js
+    assert 'actor: "familia"' in js
+    assert "/api/banco/transferencias" not in js
