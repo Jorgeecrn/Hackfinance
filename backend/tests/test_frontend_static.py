@@ -31,3 +31,15 @@ def test_index_is_bank_app():
 
 def test_removed_pages_gone():
     assert client.get("/banco.html").status_code == 404
+
+
+def test_llamada_redirects_to_app():
+    html = client.get("/llamada/").text
+    assert 'location.replace("/")' in html
+    assert '<meta http-equiv="refresh" content="0; url=/">' in html
+
+
+def test_presenter_links_app_root():
+    html = client.get("/llamada/presentador.html").text
+    assert 'href="/"' in html
+    assert 'href="/llamada/"' not in html

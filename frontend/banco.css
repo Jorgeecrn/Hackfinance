@@ -67,3 +67,23 @@ body { background: var(--bg); }
 .bk-nav button { background: transparent; border: 0; font: inherit; font-size: .75rem; color: var(--text-soft); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; cursor: pointer; }
 .bk-nav button .i { width: 24px; height: 24px; }
 .bk-nav button[aria-current="page"] { color: var(--brand); font-weight: 700; }
+
+/* transferir: presets, chat del escudo y resultado */
+.bk-presets { font-size: .8rem; color: var(--text-soft); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bk-presets button { font: inherit; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-soft); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+.bk-shield-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.bk-shield-head .i { width: 28px; height: 28px; color: var(--brand); }
+.bk-chat { display: flex; flex-direction: column; gap: 10px; min-height: 260px; margin-bottom: 12px; }
+.bk-msg { max-width: 85%; padding: 10px 14px; border-radius: 18px; line-height: 1.35; }
+.bk-msg.agent { align-self: flex-start; background: var(--brand-soft); color: var(--brand-ink); border-bottom-left-radius: 6px; }
+.bk-msg.client { align-self: flex-end; background: var(--surface-3); border-bottom-right-radius: 6px; }
+.bk-typing { align-self: flex-start; color: var(--text-soft); font-style: italic; font-size: .9rem; }
+.bk-reply { display: flex; gap: 8px; margin-bottom: 8px; }
+.bk-reply input { flex: 1; min-width: 0; }
+.bk-result { text-align: center; padding: 28px 8px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.bk-result .ring { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; }
+.bk-result .ring .i { width: 44px; height: 44px; }
+.bk-result.execute .ring { background: var(--verde-bg); color: var(--verde); }
+.bk-result.hold .ring { background: var(--rojo-bg); color: var(--rojo); }
+.bk-result.review .ring { background: var(--amarillo-bg); color: var(--amarillo); }
+.bk-result p { font-size: 1.1rem; margin: 0; }

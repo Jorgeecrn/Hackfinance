@@ -3,7 +3,7 @@
 const CACHE = "centinela-v3";
 const SHELL = [
   "/", "/index.html", "/styles.css", "/banco.css", "/manifest.webmanifest",
-  "/js/common.js", "/js/banco/core.js", "/js/banco/app.js", "/js/banco/inicio.js", "/js/banco/perfil.js",
+  "/js/common.js", "/js/banco/core.js", "/js/banco/app.js", "/js/banco/inicio.js", "/js/banco/perfil.js", "/js/banco/transferir.js",
   "/icons.svg", "/icons/icon-192.png", "/icons/icon-512.png",
 ];
 

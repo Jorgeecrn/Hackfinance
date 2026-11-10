@@ -59,7 +59,48 @@
       </section>
 
       <!-- ============ TRANSFERIR ============ -->
-      <section id="tab-transferir" class="bk-tab hidden" aria-label="Transferir"></section>
+      <section id="tab-transferir" class="bk-tab hidden" aria-label="Transferir">
+        <div data-screen="form">
+          <h2>Nueva transferencia</h2>
+          <form id="form-transfer" class="bk-card">
+            <label for="tx-name">Beneficiario</label>
+            <input id="tx-name" type="text" maxlength="80" required autocomplete="off">
+            <label for="tx-iban">IBAN</label>
+            <input id="tx-iban" type="text" maxlength="42" required autocomplete="off" placeholder="ES00 0000 0000 0000 0000 0000">
+            <label for="tx-amount">Importe (€)</label>
+            <input id="tx-amount" type="number" min="0.01" step="0.01" required>
+            <label for="tx-concept">Concepto</label>
+            <input id="tx-concept" type="text" maxlength="140" autocomplete="off">
+            <div class="actions"><button class="btn btn-primary bk-wide" type="submit" id="tx-send">Enviar</button></div>
+          </form>
+          <div class="bk-presets">Demo: rellenar escenario
+            <button type="button" data-preset="normal">1</button>
+            <button type="button" data-preset="casero">2</button>
+            <button type="button" data-preset="estafa">3</button>
+          </div>
+        </div>
+
+        <div data-screen="chat" class="hidden">
+          <div class="bk-shield-head">
+            <svg class="i" aria-hidden="true"><use href="/icons.svg#shield"/></svg>
+            <div><strong>Escudo de Banco Demo</strong><br><span class="small muted">Tu transferencia está en pausa un momento</span></div>
+          </div>
+          <div class="bk-chat" id="chat" aria-live="polite"></div>
+          <form class="bk-reply" id="form-reply">
+            <input id="reply-text" type="text" maxlength="500" placeholder="Escribe tu respuesta" autocomplete="off" required>
+            <button class="btn btn-primary btn-small" id="reply-send" type="submit">Responder</button>
+          </form>
+          <button class="bk-back" id="chat-exit" type="button">Salir (la transferencia sigue en pausa)</button>
+        </div>
+
+        <div data-screen="result" class="hidden">
+          <div class="bk-result" id="result">
+            <div class="ring"><svg class="i" aria-hidden="true"><use id="result-icon" href="/icons.svg#check-circle"/></svg></div>
+            <p id="result-text"></p>
+            <button class="btn btn-outline" id="result-home" type="button">Volver al inicio</button>
+          </div>
+        </div>
+      </section>
 
       <!-- ============ PROTECCIÓN ============ -->
       <section id="tab-proteccion" class="bk-tab hidden" aria-label="Protección"></section>

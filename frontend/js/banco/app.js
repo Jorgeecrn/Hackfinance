@@ -3,6 +3,7 @@ import { api, subscribe, toast, unlockAudioOnFirstTouch } from "../common.js";
 import { refresh, store, wireNavigation } from "./core.js";
 import { initInicio } from "./inicio.js";
 import { initPerfil } from "./perfil.js";
+import { initTransferir } from "./transferir.js";
 
 async function init() {
   unlockAudioOnFirstTouch();
@@ -10,6 +11,7 @@ async function init() {
   wireNavigation();
   initInicio();
   initPerfil();
+  initTransferir();
   await refresh();
   setInterval(refresh, 2000);
   subscribe("usuario", {
