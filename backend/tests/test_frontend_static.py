@@ -43,3 +43,15 @@ def test_presenter_links_app_root():
     html = client.get("/llamada/presentador.html").text
     assert 'href="/"' in html
     assert 'href="/llamada/"' not in html
+
+
+def test_app_has_protection_copy():
+    html = client.get("/").text
+    assert "con tecnología Centinela" in html
+    assert "requiere permiso de notificaciones (Android)" in html
+
+
+def test_share_target_redirects_to_app():
+    r = client.post("/share-target", data={"text": "hola"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"].startswith("/?compartido=")

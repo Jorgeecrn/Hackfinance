@@ -87,3 +87,11 @@ body { background: var(--bg); }
 .bk-result.hold .ring { background: var(--rojo-bg); color: var(--rojo); }
 .bk-result.review .ring { background: var(--amarillo-bg); color: var(--amarillo); }
 .bk-result p { font-size: 1.1rem; margin: 0; }
+
+/* protección (Centinela integrado) */
+.bk-prot-head h2 { margin-bottom: 2px; }
+.bk-prot-head p { margin: 0 0 12px; }
+.bk-hero { margin-bottom: 12px; }
+.bk-tab .switch-row { margin-bottom: 12px; }
+.bk-prot-actions { margin: 12px 0 14px; }
+#tab-proteccion .banner { margin-bottom: 12px; }

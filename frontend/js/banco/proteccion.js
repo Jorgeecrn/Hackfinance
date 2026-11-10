@@ -1,116 +1,114 @@
-// App de la persona protegida (PWA).
-import {
-  api, streamAnalysis, subscribe, el, toast, LEVEL, fmtTime, CHANNEL, speak, stopSpeaking, unlockAudioOnFirstTouch,
-  icon, initials, getTheme, setTheme, fmtShort,
-} from "./common.js";
+// Pestaña Protección: Centinela integrado en Banco Demo (mensajes vigilados, comprobación manual y avisos).
+import { api, el, icon, initials, speak, stopSpeaking, streamAnalysis, toast, LEVEL, CHANNEL, fmtShort } from "../common.js";
+import { goTab, onRefresh, refresh, showScreen, store } from "./core.js";
 
 const $ = (s) => document.querySelector(s);
-const views = ["home", "check", "progress", "result", "settings"];
-let profile = null;
-let health = null;
 let selectedFile = null;
 let analyzing = false;
+let shieldTimer = null;
 const pending = []; // mensajes entrantes esperando análisis
 
+const profile = () => store.profile;
+
 // ------------------------------------------------------------ navegación
-function show(view) {
-  for (const v of views) $(`#view-${v}`).classList.toggle("hidden", v !== view);
-  window.scrollTo({ top: 0 });
-  const h = $(`#view-${view} h1, #view-${view} h2`);
+function show(screen) {
+  showScreen("proteccion", screen);
+  const h = $(`#tab-proteccion [data-screen="${screen}"] h2`);
   if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); }
 }
-document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => { stopSpeaking(); show("home"); }));
 
-// ------------------------------------------------------------ perfil
-async function loadProfile() {
-  profile = await api("/api/perfil");
-  document.documentElement.dataset.letra = profile.tamano_letra || "grande";
-  const h = new Date().getHours();
-  $("#hello").textContent = h < 6 ? "Buenas noches," : h < 14 ? "Buenos días," : h < 21 ? "Buenas tardes," : "Buenas noches,";
-  $("#greeting").textContent = profile.nombre || "Hola";
-  const on = !!profile.proteccion_activa;
+// ------------------------------------------------------------ estado
+function renderProfile() {
+  const p = profile();
+  if (!p) return;
+  const on = !!p.proteccion_activa;
   $("#hero").classList.toggle("off", !on);
   $("#hero-icon use").setAttribute("href", `/icons.svg#${on ? "shield-check" : "shield-off"}`);
   $("#hero-title").textContent = on ? "Protección activada" : "Protección desactivada";
   $("#hero-sub").textContent = on
     ? "Reviso tus mensajes nuevos y te aviso si hay peligro."
-    : "Ahora mismo no reviso tus mensajes. Actívala en Ajustes.";
-  const pill = $("#protection-pill");
-  pill.className = "pill " + (profile.proteccion_activa ? "on" : "off");
-  pill.querySelector("span:last-child").textContent = profile.proteccion_activa ? "Protegido/a" : "Sin protección";
-  pill.setAttribute("aria-label", profile.proteccion_activa ? "Protección contra estafas activada" : "Protección contra estafas desactivada");
-  $("#inbox-help").textContent = profile.proteccion_activa
+    : "Ahora mismo no reviso tus mensajes. Actívala con el interruptor.";
+  $("#set-proteccion").checked = on;
+  $("#inbox-help").textContent = on
     ? "La protección está activada: reviso solos los mensajes nuevos."
-    : "La protección está desactivada. Puedes activarla en Ajustes.";
+    : "La protección está desactivada. Puedes activarla con el interruptor de arriba.";
 }
 
+function renderShield() {
+  const b = $("#shield-banner");
+  const escudo = store.bank?.escudo;
+  clearInterval(shieldTimer);
+  if (!escudo?.activo || !escudo.activo_hasta) { b.classList.add("hidden"); return; }
+  const until = new Date(escudo.activo_hasta).getTime();
+  const tick = () => {
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    if (!left) { clearInterval(shieldTimer); b.classList.add("hidden"); refresh(); return; }
+    const mm = String(Math.floor(left / 60)).padStart(2, "0");
+    const ss = String(left % 60).padStart(2, "0");
+    b.replaceChildren(icon("lock"), el("span", {},
+      `Pagos a cuentas nuevas en revisión durante ${mm}:${ss}.`,
+      escudo.motivo ? el("br") : null,
+      escudo.motivo ? el("span", { class: "small" }, `Motivo: ${escudo.motivo}`) : null));
+  };
+  tick();
+  b.classList.remove("hidden");
+  shieldTimer = setInterval(tick, 1000);
+}
+
+export function onShieldEvent() {
+  refresh().then(renderShield);
+}
+
+// ------------------------------------------------------------ contactos y avisos
 function fillSettings() {
-  $("#set-proteccion").checked = !!profile.proteccion_activa;
-  $("#set-voz").checked = !!profile.leer_en_voz_alta;
-  $("#set-escudo").checked = !!profile.escudo_bancario;
-  $("#set-nombre").value = profile.nombre || "";
-  $("#set-letra").value = profile.tamano_letra || "grande";
-  const f = profile.familiar || {};
+  const p = profile() || {};
+  $("#set-voz").checked = !!p.leer_en_voz_alta;
+  $("#set-escudo").checked = !!p.escudo_bancario;
+  const f = p.familiar || {};
   $("#set-fam-nombre").value = f.nombre || "";
   $("#set-fam-relacion").value = f.relacion || "";
   $("#set-fam-tel").value = f.telefono || "";
-  $("#set-voz-id").value = profile.voz_id || "";
-  $("#set-tema").value = getTheme();
+  $("#set-voz-id").value = p.voz_id || "";
   renderContacts();
-  if (health) {
-    $("#health").textContent = `IA: ${health.ia ? "activada (" + health.modelo + ")" : "modo básico sin IA"} · Voz ElevenLabs: ${health.voz ? "activada" : "voz del navegador"} · Avisos por Telegram: ${health.telegram ? "sí" : "no"}`;
+  const h = store.health;
+  if (h) {
+    $("#health").textContent = `IA: ${h.ia ? "activada (" + h.modelo + ")" : "modo básico sin IA"} · Voz ElevenLabs: ${h.voz ? "activada" : "voz del navegador"} · Avisos por Telegram: ${h.telegram ? "sí" : "no"}`;
   }
 }
 
 function renderContacts() {
-  const box = $("#contacts");
-  box.replaceChildren(...(profile.contactos || []).map((c, i) =>
+  const p = profile();
+  $("#contacts").replaceChildren(...(p?.contactos || []).map((c, i) =>
     el("span", { class: "chip" }, `${c.nombre} · ${c.telefono}`,
-      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { profile.contactos.splice(i, 1); renderContacts(); } }, icon("x")))));
+      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { p.contactos.splice(i, 1); renderContacts(); } }, icon("x")))));
 }
 
-$("#btn-add-contact").addEventListener("click", () => {
-  const nombre = $("#new-contact-name").value.trim();
-  const telefono = $("#new-contact-tel").value.trim();
-  if (!nombre || !telefono) { toast("Escribe el nombre y el teléfono"); return; }
-  profile.contactos = [...(profile.contactos || []), { nombre, telefono, relacion: $("#new-contact-rel").value.trim() }];
-  ["#new-contact-name", "#new-contact-tel", "#new-contact-rel"].forEach((s) => ($(s).value = ""));
-  renderContacts();
-});
-
-$("#btn-settings").addEventListener("click", () => { fillSettings(); show("settings"); });
-$("#set-letra").addEventListener("change", (e) => (document.documentElement.dataset.letra = e.target.value));
-$("#set-tema").addEventListener("change", (e) => setTheme(e.target.value));
-
-$("#btn-save-settings").addEventListener("click", async () => {
+async function saveSettings() {
+  const p = profile() || {};
   const body = {
-    nombre: $("#set-nombre").value.trim(),
-    proteccion_activa: $("#set-proteccion").checked,
     leer_en_voz_alta: $("#set-voz").checked,
     escudo_bancario: $("#set-escudo").checked,
-    tamano_letra: $("#set-letra").value,
     voz_id: $("#set-voz-id").value.trim(),
     familiar: { nombre: $("#set-fam-nombre").value.trim(), relacion: $("#set-fam-relacion").value.trim(), telefono: $("#set-fam-tel").value.trim() },
-    contactos: profile.contactos || [],
+    contactos: p.contactos || [],
   };
   try {
     await api("/api/perfil", { method: "PUT", json: body });
-    await loadProfile();
+    await refresh();
     toast("Ajustes guardados");
-    show("home");
+    show("main");
   } catch (e) { toast("No se han podido guardar: " + e.message); }
-});
+}
 
 // ------------------------------------------------------------ bandeja
 async function loadInbox() {
-  const msgs = await api("/api/mensajes");
-  const list = $("#inbox");
-  renderStats(msgs);
-  if (!msgs.length) {
-    list.replaceChildren(el("li", { class: "empty" }, icon("inbox"), "Todavía no hay mensajes."));
-    return;
-  }
-  list.replaceChildren(...msgs.map(renderInboxItem));
+  try {
+    const msgs = await api("/api/mensajes");
+    renderStats(msgs);
+    $("#inbox").replaceChildren(...(msgs.length
+      ? msgs.map(renderInboxItem)
+      : [el("li", { class: "empty" }, icon("inbox"), "Todavía no hay mensajes.")]));
+  } catch (e) { console.warn(e); }
 }
 
 function renderStats(msgs) {
@@ -123,10 +121,11 @@ function renderStats(msgs) {
 
 function renderInboxItem(m) {
   const level = m.analisis?.nivel;
+  const on = profile()?.proteccion_activa;
   const ini = initials(m.remitente || "");
   const badge = el("span", { class: `badge ${level || ""}`, "aria-hidden": "true" },
     level ? icon(LEVEL[level].icon) : (ini || icon(m.canal === "email" ? "mail" : "message")));
-  const status = level ? m.analisis.titulo : (profile?.proteccion_activa ? "Pendiente de revisar" : "Sin revisar");
+  const status = level ? m.analisis.titulo : (on ? "Pendiente de revisar" : "Sin revisar");
   return el("li", {},
     el("button", { onclick: () => openMessage(m), "aria-label": `Mensaje de ${m.remitente}. ${status}` },
       badge,
@@ -134,7 +133,7 @@ function renderInboxItem(m) {
         el("div", { class: "meta" }, el("span", { class: "from" }, m.remitente || "Desconocido"), el("span", { class: "time" }, fmtShort(m.fecha))),
         el("div", { class: "preview" }, m.texto),
         el("div", { class: "foot" },
-          el("span", { class: `chip-status ${level || ""}` }, level ? LEVEL[level].label : (profile?.proteccion_activa ? "Revisando…" : "Sin revisar")),
+          el("span", { class: `chip-status ${level || ""}` }, level ? LEVEL[level].label : (on ? "Revisando…" : "Sin revisar")),
           el("span", { class: "tag" }, CHANNEL[m.canal] || m.canal)))));
 }
 
@@ -148,33 +147,13 @@ function openMessage(m) {
   runAnalysis(form, { visible: true });
 }
 
-// ------------------------------------------------------------ comprobar manualmente
-$("#btn-check").addEventListener("click", () => { resetCheck(); show("check"); $("#check-text").focus(); });
-
+// ------------------------------------------------------------ comprobar a mano
 function resetCheck() {
   $("#check-text").value = "";
   $("#check-sender").value = "";
   selectedFile = null;
   $("#file-chosen").textContent = "";
 }
-
-for (const id of ["#file-image", "#file-audio"]) {
-  $(id).addEventListener("change", (e) => {
-    selectedFile = e.target.files[0] || null;
-    $("#file-chosen").textContent = selectedFile ? `Archivo añadido: ${selectedFile.name}` : "";
-  });
-}
-
-$("#btn-analyze").addEventListener("click", () => {
-  const texto = $("#check-text").value.trim();
-  if (!texto && !selectedFile) { toast("Pega el mensaje o añade una captura o nota de voz"); return; }
-  const form = new FormData();
-  form.append("texto", texto);
-  form.append("remitente", $("#check-sender").value.trim());
-  form.append("canal", "manual");
-  if (selectedFile) form.append("archivo", selectedFile, selectedFile.name);
-  runAnalysis(form, { visible: true });
-});
 
 // ------------------------------------------------------------ grabar con el micrófono
 let recorder = null;
@@ -212,8 +191,6 @@ async function toggleRecording(btn) {
     toast("No tengo permiso para usar el micrófono");
   }
 }
-$("#btn-record").addEventListener("click", (e) => toggleRecording(e.currentTarget));
-$("#btn-record-home").addEventListener("click", (e) => toggleRecording(e.currentTarget));
 
 // ------------------------------------------------------------ análisis
 function addStep(ev) {
@@ -228,7 +205,7 @@ function addStep(ev) {
 }
 
 async function runAnalysis(form, { visible }) {
-  if (analyzing) { toast("Espera, estoy terminando otra comprobación"); return; }
+  if (analyzing) { toast("Espera, estoy terminando otra comprobación"); return null; }
   analyzing = true;
   if (visible) { $("#steps").replaceChildren(); show("progress"); }
   let result = null;
@@ -245,14 +222,15 @@ async function runAnalysis(form, { visible }) {
     analyzing = false;
   }
   if (error) {
-    if (visible) { toast(error, 5000); show("home"); }
+    if (visible) { toast(error, 5000); show("main"); }
     return null;
   }
   await loadInbox();
+  if (result?.escudo_activado) onShieldEvent();
   if (visible && result) {
     renderResult(result);
     show("result");
-    if (profile?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile.voz_id });
+    if (profile()?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile().voz_id });
   }
   processQueue();
   return result;
@@ -261,10 +239,11 @@ async function runAnalysis(form, { visible }) {
 function verdictCard(result, { compact = false } = {}) {
   const v = result.veredicto;
   const lv = LEVEL[v.nivel];
-  const fam = profile?.familiar || {};
+  const p = profile();
+  const fam = p?.familiar || {};
   const famName = fam.nombre || "tu familiar";
   const actions = el("div", { class: "actions" + (compact ? "" : " two") });
-  actions.append(el("button", { class: "btn btn-primary", onclick: () => speak(v.mensaje_voz, { voiceId: profile?.voz_id }) }, icon("volume"), "Escuchar"));
+  actions.append(el("button", { class: "btn btn-primary", onclick: () => speak(v.mensaje_voz, { voiceId: p?.voz_id }) }, icon("volume"), "Escuchar"));
   if ((v.acciones || []).includes("llamar_familiar") && fam.telefono) {
     actions.append(el("a", { class: "btn btn-ok", href: `tel:${fam.telefono.replace(/\s/g, "")}` }, icon("phone"), `Llamar a ${famName}`));
   }
@@ -291,9 +270,9 @@ function verdictCard(result, { compact = false } = {}) {
   const evIcon = v.nivel === "verde" ? "check" : v.nivel === "rojo" ? "x" : "alert";
   const body = el("div", { class: "verdict-body" },
     el("p", {}, v.explicacion),
-    v.pruebas?.length ? el("div", {}, el("h3", {}, "Lo que he comprobado"), el("ul", { class: "evidence" }, v.pruebas.map((p) => el("li", {}, icon(evIcon), el("span", {}, p))))) : null,
+    v.pruebas?.length ? el("div", {}, el("h3", {}, "Lo que he comprobado"), el("ul", { class: "evidence" }, v.pruebas.map((x) => el("li", {}, icon(evIcon), el("span", {}, x))))) : null,
     el("p", { class: "advice" }, icon("sparkles"), el("span", {}, v.consejo)),
-    result.escudo_activado ? el("div", { class: "banner shield" }, icon("lock"), el("span", {}, "He activado el escudo bancario: tu banco pausará un rato las transferencias a cuentas nuevas.")) : null,
+    result.escudo_activado ? el("div", { class: "banner shield" }, icon("lock"), el("span", {}, "Durante un rato, Banco Demo revisará los pagos a cuentas nuevas para protegerte.")) : null,
     actions,
     compact ? null : el("details", {},
       el("summary", {}, "Ver cómo lo he investigado"),
@@ -311,7 +290,7 @@ function verdictCard(result, { compact = false } = {}) {
 }
 
 function renderResult(result) {
-  $("#result").replaceChildren(verdictCard(result));
+  $("#verdict").replaceChildren(verdictCard(result));
 }
 
 // ------------------------------------------------------------ alerta para mensajes entrantes
@@ -327,10 +306,9 @@ function showOverlay(result) {
   title.focus({ preventScroll: true });
   card.scrollTop = 0;
   if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-  if (profile?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile.voz_id });
+  if (profile()?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile().voz_id });
 }
 function hideOverlay() { stopSpeaking(); $("#overlay").classList.add("hidden"); }
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideOverlay(); });
 
 async function processQueue() {
   if (analyzing || !pending.length) return;
@@ -344,33 +322,21 @@ async function processQueue() {
   if (res && res.veredicto.nivel !== "verde") showOverlay(res);
 }
 
-function onIncoming(m) {
+export function onIncomingMessage(m) {
   loadInbox();
-  if (!profile?.proteccion_activa) return;
+  if (!profile()?.proteccion_activa) return;
   toast(`Nuevo mensaje de ${m.remitente || "desconocido"}: lo estoy revisando…`);
   pending.push(m);
   processQueue();
 }
 
-// ------------------------------------------------------------ escudo bancario
-async function refreshShield() {
-  try {
-    const bank = await api("/api/banco");
-    const b = $("#shield-banner");
-    if (bank.escudo.activo) {
-      const until = new Date(bank.escudo.activo_hasta).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-      b.replaceChildren(icon("lock"), el("span", {}, `Escudo bancario activo hasta las ${until}: las transferencias a cuentas nuevas necesitan el visto bueno de ${profile?.familiar?.nombre || "tu familiar"}.`));
-      b.classList.remove("hidden");
-    } else b.classList.add("hidden");
-  } catch (_) { /* sin banco */ }
-}
-
 // ------------------------------------------------------------ contenido compartido (Web Share Target)
-async function handleShared() {
+export async function handleShared() {
   const params = new URLSearchParams(location.search);
   const id = params.get("compartido");
   if (!id) return;
   history.replaceState({}, "", "/");
+  goTab("proteccion");
   try {
     const data = await api(`/api/compartido/${id}`);
     const form = new FormData();
@@ -385,21 +351,56 @@ async function handleShared() {
 }
 
 // ------------------------------------------------------------ arranque
-async function init() {
-  unlockAudioOnFirstTouch();
-  try { health = await api("/api/health"); } catch (_) { /* sin servidor */ }
-  await loadProfile();
-  await loadInbox();
-  refreshShield();
-  subscribe("usuario", {
-    mensaje: onIncoming,
-    perfil: () => loadProfile(),
-    escudo: () => refreshShield(),
-    transferencia_retenida: (tx) => toast(`Hemos retenido una transferencia de ${tx.importe} € a una cuenta nueva`, 6000),
-    reset: () => location.reload(),
+export function initProteccion() {
+  let lastShield = null;
+  onRefresh(() => {
+    renderProfile();
+    const key = JSON.stringify(store.bank?.escudo || null);
+    if (key !== lastShield) { lastShield = key; renderShield(); }
   });
-  handleShared();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-}
+  $("#basic-mode").classList.toggle("hidden", store.health?.ia !== false);
 
-init().catch((e) => { console.error(e); toast("No se ha podido cargar la aplicación"); });
+  document.querySelectorAll("[data-prot-back]").forEach((b) => b.addEventListener("click", () => { stopSpeaking(); show("main"); }));
+  $("#set-proteccion").addEventListener("change", async (e) => {
+    try {
+      await api("/api/perfil", { method: "PUT", json: { proteccion_activa: e.target.checked } });
+      await refresh();
+      loadInbox();
+    } catch (err) { toast("No se ha podido cambiar: " + err.message); e.target.checked = !e.target.checked; }
+  });
+  $("#btn-contacts").addEventListener("click", fillSettings);
+  $("#btn-add-contact").addEventListener("click", () => {
+    const p = profile();
+    const nombre = $("#new-contact-name").value.trim();
+    const telefono = $("#new-contact-tel").value.trim();
+    if (!p) return;
+    if (!nombre || !telefono) { toast("Escribe el nombre y el teléfono"); return; }
+    p.contactos = [...(p.contactos || []), { nombre, telefono, relacion: $("#new-contact-rel").value.trim() }];
+    ["#new-contact-name", "#new-contact-tel", "#new-contact-rel"].forEach((s) => ($(s).value = ""));
+    renderContacts();
+  });
+  $("#btn-save-settings").addEventListener("click", saveSettings);
+
+  $("#btn-check").addEventListener("click", () => { resetCheck(); show("check"); $("#check-text").focus(); });
+  for (const id of ["#file-image", "#file-audio"]) {
+    $(id).addEventListener("change", (e) => {
+      selectedFile = e.target.files[0] || null;
+      $("#file-chosen").textContent = selectedFile ? `Archivo añadido: ${selectedFile.name}` : "";
+    });
+  }
+  $("#btn-analyze").addEventListener("click", () => {
+    const texto = $("#check-text").value.trim();
+    if (!texto && !selectedFile) { toast("Pega el mensaje o añade una captura o nota de voz"); return; }
+    const form = new FormData();
+    form.append("texto", texto);
+    form.append("remitente", $("#check-sender").value.trim());
+    form.append("canal", "manual");
+    if (selectedFile) form.append("archivo", selectedFile, selectedFile.name);
+    runAnalysis(form, { visible: true });
+  });
+  $("#btn-record").addEventListener("click", (e) => toggleRecording(e.currentTarget));
+  $("#btn-record-home").addEventListener("click", (e) => toggleRecording(e.currentTarget));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideOverlay(); });
+
+  loadInbox();
+}

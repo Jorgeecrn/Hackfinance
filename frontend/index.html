@@ -103,7 +103,133 @@
       </section>
 
       <!-- ============ PROTECCIÓN ============ -->
-      <section id="tab-proteccion" class="bk-tab hidden" aria-label="Protección"></section>
+      <section id="tab-proteccion" class="bk-tab hidden" aria-label="Protección">
+        <div data-screen="main">
+          <div class="bk-prot-head">
+            <h2>Protección antiestafas</h2>
+            <p class="muted small">Banco Demo · con tecnología Centinela</p>
+          </div>
+
+          <div id="hero" class="hero bk-hero" role="status">
+            <div class="hero-shield"><div class="core"><svg class="i" id="hero-icon"><use href="/icons.svg#shield-check"/></svg></div></div>
+            <h2 id="hero-title">Protección activada</h2>
+            <p id="hero-sub">Reviso tus mensajes nuevos y te aviso si hay peligro.</p>
+            <div class="stats" id="hero-stats"></div>
+          </div>
+
+          <div class="bk-card switch-row">
+            <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa los mensajes que te llegan y te avisa si son sospechosos.</span></div>
+            <label class="switch"><input type="checkbox" id="set-proteccion" aria-label="Protección contra estafas"><span class="track"></span></label>
+          </div>
+
+          <div id="shield-banner" class="banner shield hidden" role="status"></div>
+          <div id="basic-mode" class="banner hidden" role="status"><svg class="i"><use href="/icons.svg#alert"/></svg><span>Modo básico: sin conexión con la IA, compruebo los mensajes con reglas automáticas.</span></div>
+
+          <div class="actions bk-prot-actions">
+            <button class="action-card primary" id="btn-check">
+              <span class="ac-icon"><svg class="i"><use href="/icons.svg#search"/></svg></span>
+              <span class="ac-text"><span class="ac-title">Comprobar un mensaje</span><span class="ac-sub">Pégalo, comparte una captura o una nota de voz</span></span>
+              <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
+            </button>
+            <button class="action-card" id="btn-record-home">
+              <span class="ac-icon"><svg class="i"><use href="/icons.svg#mic"/></svg></span>
+              <span class="ac-text"><span class="ac-title btn-label">Leer el mensaje en voz alta</span><span class="ac-sub">Lo escucho y te digo si es un timo</span></span>
+              <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><h2>Mensajes vigilados</h2><svg class="i muted"><use href="/icons.svg#inbox"/></svg></div>
+            <p class="muted small">Vigilar los SMS automáticamente requiere permiso de notificaciones (Android). Si no lo das, puedes comprobar cualquier mensaje a mano.</p>
+            <p class="muted small" id="inbox-help">Cuando la protección está activada, reviso solos los mensajes nuevos.</p>
+            <ul class="inbox" id="inbox" aria-live="polite"></ul>
+          </div>
+
+          <ul class="bk-list">
+            <li><button data-screen-go="contacts" id="btn-contacts"><svg class="i"><use href="/icons.svg#users"/></svg> Contactos de confianza y avisos</button></li>
+          </ul>
+        </div>
+
+        <div data-screen="check" class="hidden">
+          <button class="bk-back" data-prot-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+          <h2 id="check-title">Comprobar un mensaje</h2>
+          <div class="card">
+            <label for="check-text" style="margin-top:0">Pega aquí el mensaje que te ha llegado</label>
+            <textarea id="check-text" placeholder="Por ejemplo: «Hola mamá, este es mi número nuevo…»"></textarea>
+            <label for="check-sender">¿Quién lo envía? <span class="muted" style="font-weight:400">(opcional: número o nombre)</span></label>
+            <input id="check-sender" type="text" inputmode="tel" autocomplete="off" placeholder="+34 6...">
+            <div class="actions two">
+              <label class="btn btn-outline file-btn" for="file-image"><svg class="i"><use href="/icons.svg#camera"/></svg> Añadir captura</label>
+              <label class="btn btn-outline file-btn" for="file-audio"><svg class="i"><use href="/icons.svg#headphones"/></svg> Añadir nota de voz</label>
+            </div>
+            <input id="file-image" type="file" accept="image/*" class="sr-only">
+            <input id="file-audio" type="file" accept="audio/*" class="sr-only">
+            <p id="file-chosen" class="muted small" aria-live="polite" style="margin-top:10px"></p>
+            <div class="actions">
+              <button class="btn btn-primary bk-wide" id="btn-analyze"><svg class="i"><use href="/icons.svg#shield-check"/></svg> Comprobar ahora</button>
+              <button class="btn btn-outline bk-wide" id="btn-record"><svg class="i"><use href="/icons.svg#mic"/></svg> <span class="btn-label">Grabar: leo el mensaje o pongo el audio</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div data-screen="progress" class="hidden">
+          <div class="scan">
+            <div class="scan-orb"><div class="core"><svg class="i"><use href="/icons.svg#search"/></svg></div></div>
+            <h2 id="progress-title">Comprobando…</h2>
+            <p class="muted">Estoy investigando el mensaje. Tardo unos segundos.</p>
+          </div>
+          <div class="card"><ul class="steps" id="steps" aria-live="polite"></ul></div>
+        </div>
+
+        <div data-screen="result" class="hidden">
+          <div id="verdict"></div>
+          <button class="btn btn-outline bk-wide" data-prot-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver a Protección</button>
+        </div>
+
+        <div data-screen="contacts" class="hidden">
+          <button class="bk-back" data-prot-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+          <h2>Contactos de confianza y avisos</h2>
+          <div class="card">
+            <div class="switch-row">
+              <div class="txt"><strong>Leerme los avisos en voz alta</strong><span class="muted small">Con una voz tranquila y clara.</span></div>
+              <label class="switch"><input type="checkbox" id="set-voz" aria-label="Leer los avisos en voz alta"><span class="track"></span></label>
+            </div>
+            <div class="switch-row">
+              <div class="txt"><strong>Frenar pagos a cuentas nuevas tras un mensaje sospechoso</strong><span class="muted small">Durante un rato, Banco Demo revisará las transferencias a cuentas nuevas.</span></div>
+              <label class="switch"><input type="checkbox" id="set-escudo" aria-label="Frenar pagos a cuentas nuevas tras un mensaje sospechoso"><span class="track"></span></label>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Familiar de confianza</h2>
+            <p class="muted small">Le avisaremos si recibes un timo, y podrás llamarle con un solo botón.</p>
+            <label for="set-fam-nombre">Nombre</label>
+            <input id="set-fam-nombre" type="text">
+            <label for="set-fam-relacion">Parentesco</label>
+            <input id="set-fam-relacion" type="text" placeholder="hija, hijo, nieto…">
+            <label for="set-fam-tel">Teléfono</label>
+            <input id="set-fam-tel" type="tel">
+          </div>
+          <div class="card">
+            <h2>Contactos de confianza</h2>
+            <p class="muted small">Los mensajes de estos números se consideran de confianza.</p>
+            <div class="chip-list" id="contacts"></div>
+            <div class="grid-2" style="margin-top:8px">
+              <div><label for="new-contact-name">Nombre</label><input id="new-contact-name" type="text"></div>
+              <div><label for="new-contact-tel">Teléfono</label><input id="new-contact-tel" type="tel"></div>
+            </div>
+            <label for="new-contact-rel">Parentesco</label>
+            <input id="new-contact-rel" type="text">
+            <div class="actions"><button class="btn btn-outline" id="btn-add-contact"><svg class="i"><use href="/icons.svg#plus"/></svg> Añadir contacto</button></div>
+          </div>
+          <details class="card">
+            <summary>Opciones avanzadas</summary>
+            <label for="set-voz-id">ID de voz de ElevenLabs (por ejemplo, la voz de tu nieto con su permiso)</label>
+            <input id="set-voz-id" type="text" placeholder="Vacío = voz por defecto">
+            <p class="muted small" id="health" style="margin-top:10px"></p>
+          </details>
+          <div class="actions"><button class="btn btn-primary bk-wide" id="btn-save-settings"><svg class="i"><use href="/icons.svg#check"/></svg> Guardar</button></div>
+        </div>
+      </section>
 
       <!-- ============ PERFIL ============ -->
       <section id="tab-perfil" class="bk-tab hidden" aria-label="Perfil">
@@ -149,7 +275,7 @@
     </nav>
   </div>
 
-  <div class="overlay hidden" id="overlay" role="alertdialog" aria-modal="true"></div>
+  <div class="overlay hidden" id="overlay" role="alertdialog" aria-modal="true" aria-labelledby="overlay-title"></div>
   <script type="module" src="/js/banco/app.js"></script>
 </body>
 </html>
