@@ -1,13 +1,13 @@
 {
-  "name": "Centinela – Protección contra estafas",
-  "short_name": "Centinela",
-  "description": "Te avisa si un mensaje que recibes puede ser una estafa.",
+  "name": "Banco Demo – con protección antiestafas",
+  "short_name": "Banco Demo",
+  "description": "Tu banco, con protección antiestafas integrada (tecnología Centinela).",
   "lang": "es",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f5f1ea",
-  "theme_color": "#1f4e79",
+  "theme_color": "#163f78",
   "icons": [
     {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
     {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},

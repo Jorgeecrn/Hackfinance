@@ -6,6 +6,8 @@ const $ = (s) => document.querySelector(s);
 let selectedFile = null;
 let analyzing = false;
 let shieldTimer = null;
+let draftContacts = []; // copia local: el sondeo de 2 s no debe borrar lo que se está editando
+let lastHero = null;
 const pending = []; // mensajes entrantes esperando análisis
 
 const profile = () => store.profile;
@@ -22,13 +24,15 @@ function renderProfile() {
   const p = profile();
   if (!p) return;
   const on = !!p.proteccion_activa;
+  $("#set-proteccion").checked = on;
+  if (lastHero === on) return; // no repetir el anuncio de role="status" en cada sondeo
+  lastHero = on;
   $("#hero").classList.toggle("off", !on);
   $("#hero-icon use").setAttribute("href", `/icons.svg#${on ? "shield-check" : "shield-off"}`);
   $("#hero-title").textContent = on ? "Protección activada" : "Protección desactivada";
   $("#hero-sub").textContent = on
     ? "Reviso tus mensajes nuevos y te aviso si hay peligro."
     : "Ahora mismo no reviso tus mensajes. Actívala con el interruptor.";
-  $("#set-proteccion").checked = on;
   $("#inbox-help").textContent = on
     ? "La protección está activada: reviso solos los mensajes nuevos."
     : "La protección está desactivada. Puedes activarla con el interruptor de arriba.";
@@ -40,15 +44,19 @@ function renderShield() {
   clearInterval(shieldTimer);
   if (!escudo?.activo || !escudo.activo_hasta) { b.classList.add("hidden"); return; }
   const until = new Date(escudo.activo_hasta).getTime();
+  const hhmm = new Date(until).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const clock = el("span", { "aria-hidden": "true" });
+  b.replaceChildren(icon("lock"), el("span", {},
+    el("span", { class: "sr-only" }, `Pagos a cuentas nuevas en revisión hasta las ${hhmm}.`),
+    el("span", { "aria-hidden": "true" }, "Pagos a cuentas nuevas en revisión durante "), clock, el("span", { "aria-hidden": "true" }, "."),
+    escudo.motivo ? el("br") : null,
+    escudo.motivo ? el("span", { class: "small" }, `Motivo: ${escudo.motivo}`) : null));
   const tick = () => {
     const left = Math.max(0, Math.round((until - Date.now()) / 1000));
     if (!left) { clearInterval(shieldTimer); b.classList.add("hidden"); refresh(); return; }
     const mm = String(Math.floor(left / 60)).padStart(2, "0");
     const ss = String(left % 60).padStart(2, "0");
-    b.replaceChildren(icon("lock"), el("span", {},
-      `Pagos a cuentas nuevas en revisión durante ${mm}:${ss}.`,
-      escudo.motivo ? el("br") : null,
-      escudo.motivo ? el("span", { class: "small" }, `Motivo: ${escudo.motivo}`) : null));
+    clock.textContent = `${mm}:${ss}`;
   };
   tick();
   b.classList.remove("hidden");
@@ -69,6 +77,7 @@ function fillSettings() {
   $("#set-fam-relacion").value = f.relacion || "";
   $("#set-fam-tel").value = f.telefono || "";
   $("#set-voz-id").value = p.voz_id || "";
+  draftContacts = (p.contactos || []).map((c) => ({ ...c }));
   renderContacts();
   const h = store.health;
   if (h) {
@@ -77,20 +86,18 @@ function fillSettings() {
 }
 
 function renderContacts() {
-  const p = profile();
-  $("#contacts").replaceChildren(...(p?.contactos || []).map((c, i) =>
+  $("#contacts").replaceChildren(...draftContacts.map((c, i) =>
     el("span", { class: "chip" }, `${c.nombre} · ${c.telefono}`,
-      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { p.contactos.splice(i, 1); renderContacts(); } }, icon("x")))));
+      el("button", { "aria-label": `Quitar a ${c.nombre}`, onclick: () => { draftContacts.splice(i, 1); renderContacts(); } }, icon("x")))));
 }
 
 async function saveSettings() {
-  const p = profile() || {};
   const body = {
     leer_en_voz_alta: $("#set-voz").checked,
     escudo_bancario: $("#set-escudo").checked,
     voz_id: $("#set-voz-id").value.trim(),
     familiar: { nombre: $("#set-fam-nombre").value.trim(), relacion: $("#set-fam-relacion").value.trim(), telefono: $("#set-fam-tel").value.trim() },
-    contactos: p.contactos || [],
+    contactos: draftContacts,
   };
   try {
     await api("/api/perfil", { method: "PUT", json: body });
@@ -360,6 +367,9 @@ export function initProteccion() {
   });
   $("#basic-mode").classList.toggle("hidden", store.health?.ia !== false);
 
+  document.querySelectorAll('[data-tab="proteccion"], [data-goto="proteccion"]').forEach((b) => b.addEventListener("click", () => {
+    if (!analyzing) { stopSpeaking(); showScreen("proteccion", "main"); }
+  }));
   document.querySelectorAll("[data-prot-back]").forEach((b) => b.addEventListener("click", () => { stopSpeaking(); show("main"); }));
   $("#set-proteccion").addEventListener("change", async (e) => {
     try {
@@ -370,12 +380,10 @@ export function initProteccion() {
   });
   $("#btn-contacts").addEventListener("click", fillSettings);
   $("#btn-add-contact").addEventListener("click", () => {
-    const p = profile();
     const nombre = $("#new-contact-name").value.trim();
     const telefono = $("#new-contact-tel").value.trim();
-    if (!p) return;
     if (!nombre || !telefono) { toast("Escribe el nombre y el teléfono"); return; }
-    p.contactos = [...(p.contactos || []), { nombre, telefono, relacion: $("#new-contact-rel").value.trim() }];
+    draftContacts = [...draftContacts, { nombre, telefono, relacion: $("#new-contact-rel").value.trim() }];
     ["#new-contact-name", "#new-contact-tel", "#new-contact-rel"].forEach((s) => ($(s).value = ""));
     renderContacts();
   });

@@ -5,12 +5,16 @@ export const BASE = "/api/llamada";
 export const store = { state: null, profile: null, bank: null, health: null };
 
 const listeners = [];
+let warned = false;
 const TABS = ["inicio", "transferir", "proteccion", "perfil"];
 
 export function onRefresh(fn) { listeners.push(fn); }
 
 async function load(key, path) {
-  try { store[key] = await api(path); } catch (e) { console.warn(`No se pudo cargar ${path}`, e); }
+  try { store[key] = await api(path); } catch (e) {
+    console.warn(`No se pudo cargar ${path}`, e);
+    if (!warned) { warned = true; toast("No se han podido actualizar los datos. Reintentando…"); }
+  }
 }
 
 /** Recarga el estado del banco, el perfil y el escudo, y avisa a cada pestaña. */

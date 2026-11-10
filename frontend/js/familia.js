@@ -62,11 +62,12 @@ function renderHeld() {
         el("summary", {}, "Ver la conversación con el banco"),
         ...c.transcript.map((t) => el("p", { class: "small" }, el("strong", {}, t.role === "agent" ? "Banco: " : "Ella: "), t.text))) : null,
       el("div", { class: "btns" },
-        el("button", { class: "btn btn-danger", onclick: () => resolve(c.id, "block") }, icon("x"), "Bloquear"),
-        el("button", { class: "btn btn-outline", onclick: () => resolve(c.id, "release") }, icon("check"), "Liberar"))))));
+        el("button", { class: "btn btn-danger", onclick: (e) => resolve(c.id, "block", e.currentTarget) }, icon("x"), "Bloquear"),
+        el("button", { class: "btn btn-outline", onclick: (e) => resolve(c.id, "release", e.currentTarget) }, icon("check"), "Liberar"))))));
 }
 
-async function resolve(id, decision) {
+async function resolve(id, decision, btn) {
+  btn?.parentElement?.querySelectorAll("button").forEach((b) => { b.disabled = true; });
   try {
     await api(`/api/llamada/cases/${id}/decision`, { method: "POST", json: { decision, actor: "familia" } });
     toast(decision === "block" ? "Transferencia bloqueada: el dinero no ha salido" : "Transferencia liberada");

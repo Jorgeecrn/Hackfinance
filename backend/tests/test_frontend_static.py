@@ -62,3 +62,17 @@ def test_family_panel_uses_bank_cases():
     assert "/api/llamada/cases" in js
     assert 'actor: "familia"' in js
     assert "/api/banco/transferencias" not in js
+
+
+def test_manifest_is_banco_demo():
+    import json
+    m = json.loads((FRONTEND_DIR / "manifest.webmanifest").read_text(encoding="utf-8"))
+    assert m["short_name"] == "Banco Demo"
+    assert m["name"].startswith("Banco Demo")
+
+
+def test_case_decision_route_runs_on_event_loop():
+    """La decisión publica en el bus SSE (asyncio.Queue): debe ejecutarse en el bucle, no en el threadpool."""
+    import inspect
+    from app.llamada import router as llamada_router
+    assert inspect.iscoroutinefunction(llamada_router.case_decision)

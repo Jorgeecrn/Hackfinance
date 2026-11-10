@@ -3,6 +3,7 @@ import { api, el, fmtMoney, fmtShort, toast } from "../common.js";
 import { BASE, onRefresh, refresh, showScreen, store } from "./core.js";
 
 const $ = (s) => document.querySelector(s);
+let lastKind;
 
 const BANNERS = {
   call: "📞 Llamada en curso",
@@ -27,9 +28,12 @@ function render(s) {
   $("#int-available").textContent = fmtMoney(accounts.ahorro.balance);
 
   const kind = bannerKind(s);
-  const banner = $("#status-banner");
-  banner.classList.toggle("hidden", !kind);
-  if (kind) { banner.className = `bk-banner ${kind}`; banner.textContent = BANNERS[kind]; }
+  if (kind !== lastKind) { // role="status": solo se anuncia cuando cambia de verdad
+    lastKind = kind;
+    const banner = $("#status-banner");
+    banner.className = kind ? `bk-banner ${kind}` : "bk-banner hidden";
+    banner.textContent = kind ? BANNERS[kind] : "";
+  }
 
   $("#movements").replaceChildren(...movements.slice(0, 8).map((m) => {
     const out = m.type === "transfer_out";

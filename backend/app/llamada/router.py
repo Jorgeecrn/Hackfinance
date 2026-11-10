@@ -82,7 +82,7 @@ def cases():
 
 
 @router.post("/cases/{case_id}/decision")
-def case_decision(case_id: str, body: DecisionIn):
+async def case_decision(case_id: str, body: DecisionIn):
     return _call(service.analyst_decision, case_id, body.decision, body.actor)
 
 
