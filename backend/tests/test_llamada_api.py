@@ -310,3 +310,53 @@ def test_reset_both_demos_clears_alert(fake_agent):
     sms_alert()
     client.post("/api/demo/reset")
     assert transfer("casero").json()["status"] == "executed"
+
+
+# ---------------------------------------------------------------- familiar de confianza
+def decide_case(case_id, decision, actor=None):
+    body = {"decision": decision} if actor is None else {"decision": decision, "actor": actor}
+    return client.post(f"{BASE}/cases/{case_id}/decision", json=body)
+
+
+def held_case(fake_agent):
+    r, _ = open_estafa_case(fake_agent, A("high", ready=True))
+    reply(r["conversationId"])
+    return cases()[0]
+
+
+def test_family_can_block_case(fake_agent):
+    case = held_case(fake_agent)
+    d = decide_case(case["id"], "block", "familia")
+    assert d.status_code == 200 and d.json()["status"] == "bloqueada"
+    assert d.json()["analystDecision"]["actor"] == "familia"
+
+
+def test_default_actor_is_analista(fake_agent):
+    case = held_case(fake_agent)
+    assert decide_case(case["id"], "release").json()["analystDecision"]["actor"] == "analista"
+
+
+def test_invalid_actor_rejected(fake_agent):
+    case = held_case(fake_agent)
+    assert decide_case(case["id"], "block", "otro").status_code == 422
+
+
+def test_family_after_analyst_conflicts(fake_agent):
+    case = held_case(fake_agent)
+    decide_case(case["id"], "block", "analista")
+    assert decide_case(case["id"], "release", "familia").status_code == 409
+    assert balance() == 10300.0
+
+
+def test_case_event_published_to_family(fake_agent):
+    from app.events import bus
+    q = bus.subscribe("familia")
+    try:
+        held_case(fake_agent)
+        events = []
+        while not q.empty():
+            events.append(q.get_nowait())
+        caso = [e for e in events if e["evento"] == "caso"]
+        assert caso and caso[-1]["datos"]["status"] == "retenida"
+    finally:
+        bus.unsubscribe("familia", q)

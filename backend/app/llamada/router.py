@@ -34,6 +34,7 @@ class ReplyIn(BaseModel):
 
 class DecisionIn(BaseModel):
     decision: Literal["release", "block"]
+    actor: Literal["analista", "familia"] = "analista"
 
 
 class CallIn(BaseModel):
@@ -82,7 +83,7 @@ def cases():
 
 @router.post("/cases/{case_id}/decision")
 def case_decision(case_id: str, body: DecisionIn):
-    return _call(service.analyst_decision, case_id, body.decision)
+    return _call(service.analyst_decision, case_id, body.decision, body.actor)
 
 
 @router.post("/demo/call")

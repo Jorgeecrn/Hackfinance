@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .. import bank as centinela_bank, state as centinela_state, tools
+from ..events import bus
 from ..config import settings
 from . import agent, store
 from .seed import FLAGGED_IBANS
@@ -115,6 +116,13 @@ def _finalize(s: dict, case: dict, assessment: dict | None, ready: bool) -> None
     _set_transfer_status(s, case["transferId"], case["status"])
 
 
+def _publish_case(case_id: str) -> None:
+    """Avisa en directo al panel del familiar cuando un caso se decide o se resuelve."""
+    case = _find_case(store.snapshot(), case_id=case_id)
+    if case and case["status"] != "en_conversacion":
+        bus.publish("familia", "caso", case)
+
+
 def _view(case: dict) -> dict:
     done = case["status"] != "en_conversacion"
     message = None if done else next((t["text"] for t in reversed(case["transcript"]) if t["role"] == "agent"), None)
@@ -204,7 +212,9 @@ async def request_transfer(amount: float, iban: str, beneficiary_name: str, conc
             c["transcript"].append({"role": "agent", "text": assessment["message"], "ts": _iso()})
         return {"status": "on_hold", **_view(c)}
 
-    return store.mutate(_first_turn)
+    result = store.mutate(_first_turn)
+    _publish_case(case["id"])
+    return result
 
 
 async def reply(conv_id: str, text: str) -> dict:
@@ -240,7 +250,9 @@ async def reply(conv_id: str, text: str) -> dict:
             c["transcript"].append({"role": "agent", "text": assessment["message"], "ts": _iso()})
         return _view(c)
 
-    return store.mutate(_after)
+    result = store.mutate(_after)
+    _publish_case(snapshot["id"])
+    return result
 
 
 # ---------------------------------------------------------------- analista
@@ -248,7 +260,7 @@ def list_cases() -> list[dict]:
     return store.snapshot()["cases"]
 
 
-def analyst_decision(case_id: str, decision: str) -> dict:
+def analyst_decision(case_id: str, decision: str, actor: str = "analista") -> dict:
     def _do(s):
         c = _find_case(s, case_id=case_id)
         if c is None:
@@ -260,8 +272,10 @@ def analyst_decision(case_id: str, decision: str) -> dict:
             c["status"] = "liberada"
         else:
             c["status"] = "bloqueada"
-        c["analystDecision"] = {"decision": decision, "ts": _iso()}
+        c["analystDecision"] = {"decision": decision, "actor": actor, "ts": _iso()}
         _set_transfer_status(s, c["transferId"], c["status"])
         return dict(c)
 
-    return store.mutate(_do)
+    result = store.mutate(_do)
+    _publish_case(case_id)
+    return result
