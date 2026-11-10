@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from .. import tools
+from .. import bank as centinela_bank, state as centinela_state, tools
 from ..config import settings
 from . import agent, store
 from .seed import FLAGGED_IBANS
@@ -127,6 +127,21 @@ def _agent_input(case: dict) -> tuple[dict, list[dict], list[dict]]:
     return transfer, [dict(x) for x in case["signals"]], [dict(t) for t in case["transcript"]]
 
 
+def _centinela_alert(now: datetime) -> str | None:
+    """Texto de la alerta si el escudo por mensaje de Centinela está activo; si no, None."""
+    try:
+        escudo_bank = centinela_state.load()["banco"]
+        if not centinela_bank.shield_active(escudo_bank):
+            return None
+        escudo = escudo_bank["escudo"]
+        remaining = datetime.fromisoformat(escudo["activo_hasta"]) - now
+        minutes = max(0, round(settings.shield_minutes - remaining.total_seconds() / 60))
+        return f"Hace {minutes} min recibió un mensaje con señales de estafa: {escudo.get('motivo') or 'mensaje sospechoso'}"
+    except Exception:
+        log.warning("No se pudo leer el escudo de Centinela", exc_info=True)
+        return None
+
+
 async def _ask_agent(case: dict) -> dict | None:
     try:
         return await agent.next_turn(*_agent_input(case))
@@ -143,12 +158,14 @@ async def request_transfer(amount: float, iban: str, beneficiary_name: str, conc
     iban = normalize_iban(iban)
     if not tools.analyze_iban(iban)["valido"]:
         raise ServiceError(422, "El IBAN no es válido")
+    now = _now()
+    recent_alert = _centinela_alert(now)
 
     def _create(s):
         if amount > s["accounts"]["corriente"]["balance"]:
             raise ServiceError(422, "Saldo insuficiente")
         risk = evaluate_risk(amount, iban, call_active, iban_pasted, s["beneficiaries"], s["movements"],
-                             FLAGGED_IBANS, _now())
+                             FLAGGED_IBANS, now, recent_alert=recent_alert)
         tx = {"id": _id("tx"), "ts": _iso(), "amount": round(amount, 2), "iban": iban,
               "beneficiaryName": beneficiary_name, "concept": concept, "score": risk["score"]}
         s["transfers"].insert(0, tx)

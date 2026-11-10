@@ -244,3 +244,69 @@ def test_centinela_untouched(fake_agent):
     client.post(f"{BASE}/demo/reset")
     bank = client.get("/api/banco").json()
     assert bank["saldo"] == 12450.3 and "MyInvestor" in bank["entidad"]
+
+
+# ---------------------------------------------------------------- escudo por mensaje de Centinela
+FALSO_HIJO = {"texto": "Hola mamá, se me ha roto el móvil, este es mi número nuevo. Necesito un bizum de 600€ urgente",
+              "remitente": "+34711234567"}
+
+
+def sms_alert():
+    r = client.post("/api/analizar", data=FALSO_HIJO)
+    assert r.status_code == 200 and r.json()["escudo_activado"] is True
+
+
+def test_sms_alert_then_new_beneficiary_goes_to_agent(fake_agent):
+    fake_agent([A("medium")])
+    sms_alert()
+    r = transfer("casero")
+    assert r.json()["status"] == "on_hold"
+    case = cases()[0]
+    assert case["score"] == 45
+    sig = next(s for s in case["signals"] if s["id"] == "alerta_estafa_reciente")
+    assert sig["detail"].startswith("Hace ") and "recibió un mensaje con señales de estafa" in sig["detail"]
+
+
+def test_sms_alert_then_pay_lucia_executes(fake_agent):
+    fake_agent([])
+    sms_alert()
+    r = transfer("normal", iban=seed.LUCIA_IBAN, beneficiaryName="Lucía López", amount=25)
+    assert r.json()["status"] == "executed"
+
+
+def test_alert_ignored_when_shield_disabled(fake_agent):
+    fake_agent([])
+    client.put("/api/perfil", json={"escudo_bancario": False})
+    client.post("/api/analizar", data=FALSO_HIJO)
+    assert transfer("casero").json()["status"] == "executed"
+    assert cases() == []
+
+
+def test_expired_shield_no_signal(fake_agent, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from app import bank
+    fake_agent([])
+    sms_alert()
+    later = datetime.now(timezone.utc) + timedelta(minutes=61)
+    monkeypatch.setattr(bank, "_now", lambda: later)
+    assert transfer("casero").json()["status"] == "executed"
+
+
+def test_centinela_state_failure_ignored(fake_agent, monkeypatch):
+    from app import state as centinela_state
+    fake_agent([])
+
+    def broken():
+        raise RuntimeError("state.json ilegible")
+
+    monkeypatch.setattr(centinela_state, "load", broken)
+    r = transfer("normal")
+    assert r.status_code == 200 and r.json()["status"] == "executed"
+
+
+def test_reset_both_demos_clears_alert(fake_agent):
+    fake_agent([])
+    sms_alert()
+    client.post("/api/demo/reset")
+    assert transfer("casero").json()["status"] == "executed"
