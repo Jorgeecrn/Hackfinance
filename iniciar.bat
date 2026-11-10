@@ -1,12 +1,12 @@
 @echo off
-rem Centinela - doble clic para arrancar la demo en Windows.
+rem Banco Demo (con Centinela) - doble clic para arrancar la demo en Windows.
 rem La primera vez prepara todo (tarda un par de minutos); despues arranca en segundos.
 chcp 65001 >nul
 cd /d "%~dp0"
 set PORT=8000
-set URL=http://localhost:%PORT%/demo.html
+set URL=http://localhost:%PORT%/
 
-echo Centinela
+echo Banco Demo (con Centinela)
 echo.
 
 rem Ya esta encendido? Entonces solo abrimos el navegador.
@@ -40,7 +40,7 @@ if not exist ".env" copy ".env.example" ".env" >nul
 rem Abrimos el navegador en cuanto el servidor responda
 start "" /b powershell -NoProfile -Command "for($i=0;$i -lt 30;$i++){try{Invoke-WebRequest -UseBasicParsing http://localhost:%PORT%/api/health | Out-Null; Start-Process '%URL%'; break}catch{Start-Sleep 1}}"
 
-echo Centinela esta en marcha en %URL%
+echo Banco Demo esta en marcha en %URL%
 echo Deja esta ventana abierta mientras la uses. Para apagarla: cierra la ventana o pulsa Ctrl + C.
 echo.
 cd backend
