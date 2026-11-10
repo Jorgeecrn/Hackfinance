@@ -1,0 +1,69 @@
+/* Banco Demo — app de banco con la protección antiestafas integrada.
+   Usa los tokens de /styles.css; letra de tamaño normal (algo mayor que una app típica). */
+:root.bk { --font-scale: 0.92; }
+body { background: var(--bg); }
+
+.bk-app { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); position: relative; }
+@media (min-width: 600px) {
+  .bk-app { margin: 20px auto; min-height: calc(100vh - 40px); border-radius: 32px; box-shadow: var(--shadow-lg); overflow: hidden; }
+}
+
+/* cabecera */
+.bk-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--brand-grad); color: var(--on-brand); position: sticky; top: 0; z-index: 5; }
+.bk-logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 1.1rem; }
+.bk-icon-btn { background: transparent; border: 0; color: inherit; padding: 6px; border-radius: 10px; cursor: pointer; }
+.bk-icon-btn .i { width: 24px; height: 24px; }
+
+/* contenido */
+.bk-main { padding: 16px 16px 96px; }
+.bk-tab h2 { font-size: 1.15rem; margin: 6px 0 10px; }
+.bk-hello { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin: 4px 0 12px; }
+.bk-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
+.bk-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bk-card-head h2 { margin: 0; font-size: 1rem; }
+.bk-back { background: transparent; border: 0; color: var(--brand); font: inherit; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; margin-bottom: 6px; }
+.bk-wide { width: 100%; }
+.bk-tab input[type="text"], .bk-tab input[type="number"], .bk-tab input[type="tel"], .bk-tab textarea { width: 100%; }
+
+/* banner de estado */
+.bk-banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-sm); font-weight: 700; font-size: .92rem; margin-bottom: 12px; }
+.bk-banner.call { background: var(--verde-bg); color: var(--verde); }
+.bk-banner.alert { background: var(--amarillo-bg); color: var(--amarillo); }
+.bk-banner.ok { background: var(--brand-soft); color: var(--brand-ink); }
+
+/* saldo */
+.bk-balance { background: var(--brand-grad); color: var(--on-brand); border-radius: 22px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--shadow); }
+.bk-balance-label { opacity: .85; font-size: .9rem; }
+.bk-balance-amount { font-family: var(--font-display); font-size: 2rem; font-weight: 800; }
+.bk-balance-iban { opacity: .8; font-size: .82rem; letter-spacing: .03em; }
+.bk-saving { display: flex; justify-content: space-between; padding: 12px 16px; margin: 10px 0 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+
+/* accesos rápidos */
+.bk-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.bk-quick button { background: transparent; border: 0; font: inherit; font-size: .82rem; color: var(--text); display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; padding: 4px 0; }
+.bk-quick button span { width: 52px; height: 52px; border-radius: 16px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
+.bk-quick .i { width: 24px; height: 24px; }
+
+/* movimientos */
+.bk-movs { list-style: none; margin: 8px 0 0; padding: 0; }
+.bk-movs li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .92rem; }
+.bk-movs li:last-child { border-bottom: 0; }
+.bk-movs .neg { font-weight: 700; }
+.bk-movs .pos { font-weight: 700; color: var(--verde); }
+
+/* listas tipo menú */
+.bk-profile { display: flex; align-items: center; gap: 14px; margin: 4px 0 16px; }
+.bk-list { list-style: none; margin: 0 0 14px; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.bk-list li + li { border-top: 1px solid var(--border); }
+.bk-list button { width: 100%; background: transparent; border: 0; font: inherit; color: var(--text); text-align: left; display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.bk-list button:hover { background: var(--surface-2); }
+.bk-list-dev button { color: var(--text-soft); font-size: .9rem; }
+.bk-version { text-align: center; }
+.bk-demo-links { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.bk-demo-links .btn { justify-content: flex-start; }
+
+/* barra inferior */
+.bk-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 10; }
+.bk-nav button { background: transparent; border: 0; font: inherit; font-size: .75rem; color: var(--text-soft); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; cursor: pointer; }
+.bk-nav button .i { width: 24px; height: 24px; }
+.bk-nav button[aria-current="page"] { color: var(--brand); font-weight: 700; }

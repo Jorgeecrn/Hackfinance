@@ -1,196 +1,114 @@
 <!doctype html>
-<html lang="es" data-letra="grande">
+<html lang="es" data-letra="normal" class="bk">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Centinela</title>
-  <meta name="description" content="Te avisa si un mensaje que recibes puede ser una estafa.">
-  <meta name="theme-color" content="#f5f1ea">
+  <title>Banco Demo</title>
+  <meta name="description" content="Tu banco, con protección antiestafas integrada.">
+  <meta name="theme-color" content="#163f78">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/banco.css">
 </head>
 <body>
   <a class="sr-only" href="#main">Ir al contenido</a>
-  <div class="app">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Centinela, inicio">
-        <span class="logo"><svg class="i"><use href="/icons.svg#shield-check"/></svg></span>
-        <span class="brand-name">Centinela</span>
-      </a>
-      <div class="row">
-        <span id="protection-pill" class="pill" role="status"><span class="dot"></span><span>…</span></span>
-        <button class="btn btn-icon btn-outline" id="btn-settings" aria-label="Ajustes"><svg class="i"><use href="/icons.svg#sliders"/></svg></button>
-      </div>
+  <div class="bk-app">
+    <header class="bk-top">
+      <div class="bk-logo"><svg class="i" aria-hidden="true"><use href="/icons.svg#bank"/></svg> <strong>Banco Demo</strong></div>
+      <button class="bk-icon-btn" data-soon aria-label="Notificaciones"><svg class="i"><use href="/icons.svg#inbox"/></svg></button>
     </header>
 
-    <main id="main">
-      <!-- INICIO -->
-      <section id="view-home" aria-labelledby="greeting">
-        <div class="greeting">
-          <p class="hello" id="hello">Hola,</p>
-          <h1 id="greeting">Bienvenida</h1>
+    <main id="main" class="bk-main">
+      <!-- ============ INICIO ============ -->
+      <section id="tab-inicio" class="bk-tab" aria-label="Inicio">
+        <div data-screen="home">
+          <p class="bk-hello" id="hello">Hola</p>
+          <div class="bk-banner hidden" id="status-banner" role="status"></div>
+          <div class="bk-balance">
+            <span class="bk-balance-label">Cuenta corriente</span>
+            <span class="bk-balance-amount" id="bal-corriente">—</span>
+            <span class="bk-balance-iban" id="iban-corriente">—</span>
+          </div>
+          <div class="bk-saving"><span>Cuenta de ahorro</span><strong id="bal-ahorro">—</strong></div>
+          <div class="bk-quick">
+            <button data-goto="transferir"><span><svg class="i"><use href="/icons.svg#send"/></svg></span>Transferir</button>
+            <button id="go-internal"><span><svg class="i"><use href="/icons.svg#rotate"/></svg></span>Traspaso</button>
+            <button data-soon><span><svg class="i"><use href="/icons.svg#smartphone"/></svg></span>Bizum</button>
+            <button data-soon><span><svg class="i"><use href="/icons.svg#lock"/></svg></span>Tarjetas</button>
+          </div>
+          <div class="bk-card">
+            <div class="bk-card-head"><h2>Últimos movimientos</h2></div>
+            <ul class="bk-movs" id="movements"></ul>
+          </div>
         </div>
 
-        <div id="hero" class="hero" role="status">
-          <div class="hero-shield"><div class="core"><svg class="i" id="hero-icon"><use href="/icons.svg#shield-check"/></svg></div></div>
-          <h2 id="hero-title">Estás protegida</h2>
-          <p id="hero-sub">Reviso tus mensajes nuevos y te aviso si hay peligro.</p>
-          <div class="stats" id="hero-stats"></div>
-        </div>
-
-        <div id="shield-banner" class="banner shield hidden" role="status"></div>
-
-        <div class="actions" style="margin-top:0">
-          <button class="action-card primary" id="btn-check">
-            <span class="ac-icon"><svg class="i"><use href="/icons.svg#search"/></svg></span>
-            <span class="ac-text"><span class="ac-title">Comprobar un mensaje</span><span class="ac-sub">Pégalo, comparte una captura o una nota de voz</span></span>
-            <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
-          </button>
-          <button class="action-card" id="btn-record-home">
-            <span class="ac-icon"><svg class="i"><use href="/icons.svg#mic"/></svg></span>
-            <span class="ac-text"><span class="ac-title btn-label">Leer el mensaje en voz alta</span><span class="ac-sub">Lo escucho y te digo si es un timo</span></span>
-            <svg class="i"><use href="/icons.svg#chevron-right"/></svg>
-          </button>
-        </div>
-
-        <div class="card">
-          <div class="card-title"><h2>Mensajes recibidos</h2><svg class="i muted"><use href="/icons.svg#inbox"/></svg></div>
-          <p class="muted small" id="inbox-help">Cuando la protección está activada, reviso solos los mensajes nuevos.</p>
-          <ul class="inbox" id="inbox" aria-live="polite"></ul>
+        <div data-screen="internal" class="hidden">
+          <button class="bk-back" data-screen-back="home"><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+          <h2>Traspaso a la cuenta corriente</h2>
+          <p class="muted small">Desde tu cuenta de ahorro (<span id="int-available">—</span> disponibles).</p>
+          <form id="form-internal" class="bk-card">
+            <label for="int-amount">Importe (€)</label>
+            <input id="int-amount" type="number" min="0.01" step="0.01" required>
+            <div class="actions"><button class="btn btn-primary bk-wide" type="submit">Traspasar</button></div>
+          </form>
         </div>
       </section>
 
-      <!-- COMPROBAR -->
-      <section id="view-check" class="hidden" aria-labelledby="check-title">
-        <div class="greeting">
-          <p class="hello">Ante la duda, pregúntame</p>
-          <h1 id="check-title">Comprobar un mensaje</h1>
-        </div>
-        <div class="card">
-          <label for="check-text" style="margin-top:0">Pega aquí el mensaje que te ha llegado</label>
-          <textarea id="check-text" placeholder="Por ejemplo: «Hola mamá, este es mi número nuevo…»"></textarea>
-          <label for="check-sender">¿Quién lo envía? <span class="muted" style="font-weight:400">(opcional: número o nombre)</span></label>
-          <input id="check-sender" type="text" inputmode="tel" autocomplete="off" placeholder="+34 6..." >
-          <div class="actions two">
-            <label class="btn btn-outline file-btn" for="file-image"><svg class="i"><use href="/icons.svg#camera"/></svg> Añadir captura</label>
-            <label class="btn btn-outline file-btn" for="file-audio"><svg class="i"><use href="/icons.svg#headphones"/></svg> Añadir nota de voz</label>
-          </div>
-          <input id="file-image" type="file" accept="image/*" class="sr-only">
-          <input id="file-audio" type="file" accept="audio/*" class="sr-only">
-          <p id="file-chosen" class="muted small" aria-live="polite" style="margin-top:10px"></p>
-          <div class="actions">
-            <button class="btn btn-primary btn-big" id="btn-analyze"><svg class="i"><use href="/icons.svg#shield-check"/></svg> Comprobar ahora</button>
-            <button class="btn btn-big btn-outline" id="btn-record"><svg class="i"><use href="/icons.svg#mic"/></svg> <span class="btn-label">Grabar: leo el mensaje o pongo el audio</span></button>
-            <button class="btn btn-ghost" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
-          </div>
-        </div>
-      </section>
+      <!-- ============ TRANSFERIR ============ -->
+      <section id="tab-transferir" class="bk-tab hidden" aria-label="Transferir"></section>
 
-      <!-- INVESTIGANDO -->
-      <section id="view-progress" class="hidden" aria-labelledby="progress-title">
-        <div class="scan">
-          <div class="scan-orb"><div class="core"><svg class="i"><use href="/icons.svg#search"/></svg></div></div>
-          <h1 id="progress-title">Comprobando…</h1>
-          <p class="muted">Estoy investigando el mensaje. Tardo unos segundos.</p>
-        </div>
-        <div class="card">
-          <ul class="steps" id="steps" aria-live="polite"></ul>
-        </div>
-      </section>
+      <!-- ============ PROTECCIÓN ============ -->
+      <section id="tab-proteccion" class="bk-tab hidden" aria-label="Protección"></section>
 
-      <!-- RESULTADO -->
-      <section id="view-result" class="hidden" aria-labelledby="result-title">
-        <div id="result"></div>
-        <button class="btn btn-outline btn-big" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver al inicio</button>
-      </section>
+      <!-- ============ PERFIL ============ -->
+      <section id="tab-perfil" class="bk-tab hidden" aria-label="Perfil">
+        <div data-screen="main">
+          <div class="bk-profile">
+            <div class="avatar" id="profile-avatar" aria-hidden="true">—</div>
+            <div><strong id="profile-name">—</strong><br><span class="muted small" id="profile-iban">—</span></div>
+          </div>
+          <ul class="bk-list">
+            <li><button data-soon><svg class="i"><use href="/icons.svg#user"/></svg> Datos personales</button></li>
+            <li><button data-soon><svg class="i"><use href="/icons.svg#inbox"/></svg> Notificaciones</button></li>
+            <li><button data-soon><svg class="i"><use href="/icons.svg#lock"/></svg> Seguridad y claves</button></li>
+            <li><button data-goto="proteccion"><svg class="i"><use href="/icons.svg#shield"/></svg> Protección antiestafas</button></li>
+            <li><button id="theme-toggle"><svg class="i"><use href="/icons.svg#eye"/></svg> <span id="theme-label">Tema oscuro</span></button></li>
+          </ul>
+          <ul class="bk-list bk-list-dev">
+            <li><button data-screen-go="demo"><svg class="i"><use href="/icons.svg#sliders"/></svg> Herramientas de demo</button></li>
+          </ul>
+          <p class="muted small bk-version">Banco Demo · versión de demostración</p>
+        </div>
 
-      <!-- AJUSTES -->
-      <section id="view-settings" class="hidden" aria-labelledby="settings-title">
-        <div class="greeting">
-          <p class="hello">Tu protección, a tu manera</p>
-          <h1 id="settings-title">Ajustes</h1>
-        </div>
-        <div class="card">
-          <div class="switch-row">
-            <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa solo los mensajes que te llegan y te avisa si son sospechosos.</span></div>
-            <label class="switch"><input type="checkbox" id="set-proteccion" aria-label="Protección contra estafas"><span class="track"></span></label>
+        <div data-screen="demo" class="hidden">
+          <button class="bk-back" data-screen-back="main"><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+          <h2>Herramientas de demo</h2>
+          <p class="muted small">Solo para el equipo: no forma parte de la app que ve la clienta.</p>
+          <div class="bk-demo-links">
+            <a class="btn btn-outline" href="/llamada/presentador.html" target="_blank"><svg class="i"><use href="/icons.svg#sliders"/></svg> Presentador</a>
+            <a class="btn btn-outline" href="/llamada/analista.html" target="_blank"><svg class="i"><use href="/icons.svg#bank"/></svg> Analista</a>
+            <a class="btn btn-outline" href="/familia.html" target="_blank"><svg class="i"><use href="/icons.svg#users"/></svg> Panel del familiar</a>
+            <a class="btn btn-outline" href="/demo.html" target="_blank"><svg class="i"><use href="/icons.svg#message"/></svg> Panel de SMS de demo</a>
+            <a class="btn btn-outline" href="/docs" target="_blank"><svg class="i"><use href="/icons.svg#external"/></svg> Documentación de la API</a>
           </div>
-          <div class="switch-row">
-            <div class="txt"><strong>Leerme los avisos en voz alta</strong><span class="muted small">Con una voz tranquila y clara.</span></div>
-            <label class="switch"><input type="checkbox" id="set-voz" aria-label="Leer los avisos en voz alta"><span class="track"></span></label>
-          </div>
-          <div class="switch-row">
-            <div class="txt"><strong>Escudo bancario</strong><span class="muted small">Si detecto un timo grave, tu banco pausa un rato las transferencias a cuentas nuevas.</span></div>
-            <label class="switch"><input type="checkbox" id="set-escudo" aria-label="Escudo bancario"><span class="track"></span></label>
-          </div>
-        </div>
-        <div class="card">
-          <h2>Tus datos</h2>
-          <label for="set-nombre">Tu nombre</label>
-          <input id="set-nombre" type="text" autocomplete="given-name">
-          <div class="grid-2">
-            <div>
-              <label for="set-letra">Tamaño de la letra</label>
-              <select id="set-letra">
-                <option value="normal">Normal</option>
-                <option value="grande">Grande</option>
-                <option value="muy-grande">Muy grande</option>
-              </select>
-            </div>
-            <div>
-              <label for="set-tema">Colores</label>
-              <select id="set-tema">
-                <option value="light">Claro</option>
-                <option value="dark">Oscuro</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <h2>Familiar de confianza</h2>
-          <p class="muted small">Le avisaré si recibes un timo, y podrás llamarle con un solo botón.</p>
-          <label for="set-fam-nombre">Nombre</label>
-          <input id="set-fam-nombre" type="text">
-          <label for="set-fam-relacion">Parentesco</label>
-          <input id="set-fam-relacion" type="text" placeholder="hija, hijo, nieto…">
-          <label for="set-fam-tel">Teléfono</label>
-          <input id="set-fam-tel" type="tel">
-        </div>
-        <div class="card">
-          <h2>Contactos de confianza</h2>
-          <p class="muted small">Los mensajes de estos números se consideran de confianza.</p>
-          <div class="chip-list" id="contacts"></div>
-          <div class="grid-2" style="margin-top:8px">
-            <div><label for="new-contact-name">Nombre</label><input id="new-contact-name" type="text"></div>
-            <div><label for="new-contact-tel">Teléfono</label><input id="new-contact-tel" type="tel"></div>
-          </div>
-          <label for="new-contact-rel">Parentesco</label>
-          <input id="new-contact-rel" type="text">
-          <div class="actions"><button class="btn btn-outline" id="btn-add-contact"><svg class="i"><use href="/icons.svg#plus"/></svg> Añadir contacto</button></div>
-        </div>
-        <details class="card">
-          <summary>Opciones avanzadas</summary>
-          <label for="set-voz-id">ID de voz de ElevenLabs (por ejemplo, la voz de tu nieto con su permiso)</label>
-          <input id="set-voz-id" type="text" placeholder="Vacío = voz por defecto">
-          <p class="muted small" id="health" style="margin-top:10px"></p>
-        </details>
-        <div class="actions">
-          <button class="btn btn-primary btn-big" id="btn-save-settings"><svg class="i"><use href="/icons.svg#check"/></svg> Guardar</button>
-          <button class="btn btn-ghost" data-back><svg class="i"><use href="/icons.svg#arrow-left"/></svg> Volver</button>
+          <div class="actions"><button class="btn btn-danger bk-wide" id="reset-all"><svg class="i"><use href="/icons.svg#rotate"/></svg> Reiniciar toda la demo</button></div>
         </div>
       </section>
     </main>
+
+    <nav class="bk-nav" aria-label="Secciones">
+      <button data-tab="inicio" aria-current="page"><svg class="i"><use href="/icons.svg#bank"/></svg><span>Inicio</span></button>
+      <button data-tab="transferir"><svg class="i"><use href="/icons.svg#send"/></svg><span>Transferir</span></button>
+      <button data-tab="proteccion"><svg class="i"><use href="/icons.svg#shield"/></svg><span>Protección</span></button>
+      <button data-tab="perfil"><svg class="i"><use href="/icons.svg#user"/></svg><span>Perfil</span></button>
+    </nav>
   </div>
 
-  <!-- Alerta a pantalla completa para mensajes entrantes peligrosos -->
-  <div id="overlay" class="overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="overlay-title">
-    <div class="sheet card" id="overlay-content"></div>
-  </div>
-
-  <script type="module" src="/js/app.js"></script>
+  <div class="overlay hidden" id="overlay" role="alertdialog" aria-modal="true"></div>
+  <script type="module" src="/js/banco/app.js"></script>
 </body>
 </html>
