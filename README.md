@@ -30,8 +30,9 @@ Centinela es una app web instalable (PWA) que revisa los SMS, mensajes de WhatsA
 ## Arquitectura
 
 ```
- PWA (HTML/JS, sin build)                    Panel familia      Banco simulado     Control demo
- index.html · Ajustes · bandeja · alertas    familia.html       banco.html         demo.html
+ App de Banco Demo (PWA, HTML/JS sin build)  Panel familia      Control demo
+ index.html · Inicio · Transferir ·          familia.html       demo.html
+   Protección (Centinela) · Perfil
         │  fetch + SSE (pasos en directo)           │ SSE              │ SSE
         ▼                                           ▼                  ▼
  FastAPI (backend/app/main.py) ─────────── bus de eventos (events.py)
@@ -97,11 +98,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Abre:
-- **http://localhost:8000/** → app de la persona mayor (ábrela en el móvil o en modo móvil del navegador)
-- **http://localhost:8000/familia.html** → panel del familiar
-- **http://localhost:8000/banco.html** → banco simulado con el escudo
+- **http://localhost:8000/** → app de **Banco Demo** con Carmen López: Inicio, Transferir, **Protección** (Centinela integrado) y Perfil. Ábrela en el móvil o en modo móvil del navegador.
+- **http://localhost:8000/familia.html** → panel del familiar (avisos y transferencias en revisión)
 - **http://localhost:8000/demo.html** → panel del presentador para enviar mensajes simulados
 - **http://localhost:8000/docs** → documentación interactiva de la API
+
+Todas las herramientas del equipo (presentador, analista, familiar, SMS de demo, API y «Reiniciar toda la demo») están en la app, en **Perfil → Herramientas de demo**.
 
 > Para probar en el móvil en la misma wifi: `http://<IP-de-tu-portátil>:8000`. La instalación como app, el micrófono y «Compartir» requieren HTTPS fuera de `localhost`. Para la demo puedes usar un túnel HTTPS (por ejemplo `cloudflared tunnel --url http://localhost:8000` o `ngrok http 8000`).
 
@@ -118,19 +120,21 @@ python eval/run_eval.py --modo ia                   # agente con Claude (necesit
 
 Cada ejecución escribe un informe en `eval/resultados_<modo>.md` con precisión, recall, falsas alarmas, latencia y la lista de fallos.
 
-## Guion de la demo (3 minutos)
+## Guion de la demo (unos 6 minutos)
 
-1. Abre `demo.html` en el portátil y la app (`/`) en un móvil. Pulsa en la pantalla del móvil una vez para permitir el sonido.
-2. Envía **«Falso MyInvestor: cuenta bloqueada»**. En el móvil aparece la alerta 🔴, la investigación (enlace que imita a MyInvestor) y el aviso hablado.
-3. Envía **«Falso hijo con número nuevo»**. Alerta 🔴, aviso a Lucía (panel de familia) y escudo bancario activado.
-4. En `banco.html` pulsa «Preset: pagar al hijo» → la operación queda **retenida**. En `familia.html` Lucía la **cancela**: el dinero no sale.
-5. Envía **«Lucía de verdad»** y **«Código real de verificación»** → 🟢: no hay falsas alarmas.
-6. En el móvil: «Comprobar un mensaje» → «Grabar» y lee un mensaje en voz alta, o sube una nota de voz.
+Una sola historia: Carmen usa la app de su banco, **Banco Demo**, que trae la protección antiestafas de Centinela integrada.
+
+1. **Inicio.** Abre la app (`/`) en un móvil y `demo.html`, `familia.html` y `llamada/analista.html` en el portátil (enlaces en Perfil → Herramientas de demo). Pulsa una vez en el móvil para permitir el sonido. Carmen ve su saldo y el banner «🛡️ Protección antiestafas activa».
+2. **Transferencia normal.** Transferir → «escenario 1» → 200 € a Javier: se envía al instante, sin preguntas.
+3. **El falso hijo.** En `demo.html` envía **«Falso hijo con número nuevo»**. En el móvil salta la alerta 🔴, se lee en voz alta y Lucía recibe el aviso en `familia.html`. En Inicio aparece «⚠️ Mensaje sospechoso reciente». Carmen intenta pagar al «hijo»: Transferir → «escenario 2», cambia el nombre a «Mi hijo» y envía (sin llamada). Como es una cuenta nueva justo después de un mensaje sospechoso, el Escudo **pausa** la transferencia y pregunta. La transferencia queda en revisión y Lucía la **bloquea** desde `familia.html`: el dinero no sale.
+4. **El falso empleado del banco.** Un compañero llama a Carmen y el presentador activa «Llamada activa». Carmen traspasa 8.000 € del ahorro y envía 8.500 € («escenario 3»). El Escudo pregunta y **retiene** la transferencia. En el panel del analista: puntuación, señales, conversación y decisión.
+5. **Comprobar a mano.** Protección → «Comprobar un mensaje» → «Grabar» y lee un mensaje en voz alta, o sube una nota de voz o una captura.
+6. **Sin falsas alarmas.** Con la llamada activa, «escenario 2» con el casero (600 € de alquiler): una o dos preguntas y se envía.
 7. Cierra con la tabla de métricas de `eval/resultados_ia.md`.
 
 ## 🛡️ Escudo de llamada (Banco Demo)
 
-Una segunda demo, independiente del resto de Centinela, para la estafa del **falso empleado del banco**: alguien llama a la víctima y la guía para que ella misma transfiera su dinero a una «cuenta segura». En esta estafa todo es legítimo (el móvil, la huella y el código son del cliente), así que los sistemas antifraude clásicos no la ven.
+Integrado en la pestaña Transferir de Banco Demo, para la estafa del **falso empleado del banco**: alguien llama a la víctima y la guía para que ella misma transfiera su dinero a una «cuenta segura». En esta estafa todo es legítimo (el móvil, la huella y el código son del cliente), así que los sistemas antifraude clásicos no la ven.
 
 **Cómo funciona:** cuando una transferencia parece arriesgada, el banco la pone en pausa y un agente de Claude (`claude-haiku-5-5`) mantiene una conversación corta con el cliente, pensada para romper el guion del estafador, antes de ejecutarla.
 
@@ -140,7 +144,7 @@ Una segunda demo, independiente del resto de Centinela, para la estafa del **fal
 - **Privacidad:** no se escuchan las llamadas. Solo se usa la señal «hay una llamada en curso» (en la demo, un interruptor en el panel del presentador).
 
 Pantallas (con el servidor en marcha):
-- **http://localhost:8000/llamada/** → app de la clienta, Carmen López (aspecto de móvil)
+- **http://localhost:8000/** → app de Banco Demo; la transferencia está en la pestaña Transferir (`/llamada/` redirige aquí)
 - **http://localhost:8000/llamada/presentador.html** → llamada simulada, reinicio de la demo y aviso si falta la clave
 - **http://localhost:8000/llamada/analista.html** → casos con puntuación, señales, conversación y botones Liberar / Bloquear
 
@@ -168,10 +172,11 @@ Repite cada guion varias veces y comprueba que el escenario 3 termina siempre re
 ```
 backend/app/        API, agente, reglas, herramientas, ElevenLabs, banco simulado
 backend/app/llamada/  escudo de llamada: riesgo, agente, política, API del Banco Demo
-frontend/llamada/   app de la clienta, presentador y analista del escudo de llamada
+frontend/js/banco/  app de Banco Demo: Inicio, Transferir, Protección (Centinela) y Perfil
+frontend/llamada/   presentador y analista del escudo de llamada
 backend/data/       dominios oficiales, campañas conocidas, bancos españoles, ejemplos de demo
 backend/tests/      tests (pytest)
-frontend/           PWA (index, familia, banco, demo), service worker, manifest, iconos
+frontend/           PWA (index = Banco Demo, familia, demo), service worker, manifest, iconos
 eval/               conjunto etiquetado y script de evaluación
 docs/               plan de trabajo, pitch y documento de una cara
 ```
