@@ -1,0 +1,870 @@
+diff --git a/.env.example b/.env.example
+index ddd8d39..a50e49e 100644
+--- a/.env.example
++++ b/.env.example
+@@ -37,5 +37,16 @@ SHIELD_AMOUNT_THRESHOLD=300
+ ESCUDO_MODEL=claude-haiku-5-5
+ ESCUDO_TIMEOUT_S=10
+ 
++# --- Tope de gasto diario (al llegar: reglas, voz del navegador y casos al analista) ---
++# El tope real de facturación ponlo también en la consola de Anthropic y en la de ElevenLabs.
++IA_MAX_LLAMADAS_DIA=500
++IA_MAX_TOKENS_DIA=4000000
++VOZ_MAX_CARACTERES_DIA=30000
++VOZ_MAX_TRANSCRIPCIONES_DIA=100
++
++# --- Rutas de administración (reiniciar demo, simular mensajes, decidir casos, panel del familiar) ---
++# Por defecto solo funcionan desde el propio portátil. true = abiertas a toda la wifi (no recomendado).
++ADMIN_REMOTO=false
++
+ # Forzar modo sin IA ni red (tests)
+ FORCE_OFFLINE=false
+diff --git a/README.md b/README.md
+index 3529cf2..95d11ba 100644
+--- a/README.md
++++ b/README.md
+@@ -181,6 +181,11 @@ eval/               conjunto etiquetado y script de evaluación
+ docs/               plan de trabajo, pitch y documento de una cara
+ ```
+ 
++## Seguridad y control de gasto
++
++- **Rutas de administración solo desde el portátil.** El servidor escucha en toda la wifi para que entre el móvil de la demo, pero reiniciar la demo, simular mensajes, ver las alertas, decidir casos del analista, activar o desactivar el escudo y consultar el gasto solo responden a peticiones desde el propio ordenador (`127.0.0.1`). Detrás de un túnel (cloudflared, ngrok) se tratan como remotas. La app del cliente (analizar, transferir, ajustes) funciona igual desde el móvil. Si necesitas abrir el panel del familiar en otro dispositivo, pon `ADMIN_REMOTO=true` en el `.env` (no recomendado en una red compartida).
++- **Tope de gasto diario.** Antes de cada llamada a Claude o a ElevenLabs se comprueba que queda margen (`IA_MAX_LLAMADAS_DIA`, `IA_MAX_TOKENS_DIA`, `VOZ_MAX_CARACTERES_DIA`, `VOZ_MAX_TRANSCRIPCIONES_DIA`). Al llegar al tope, el análisis sigue con el motor de reglas, la voz pasa a la del navegador y el Escudo de llamada envía el caso al analista. El contador está en `~/.centinela/gasto.json` (solo números, sin textos) y se consulta en `http://localhost:8000/api/gasto`. Es un freno local: el tope real de facturación se pone en la consola de cada proveedor.
++
+ ## Limitaciones conocidas y siguientes pasos
+ 
+ - Las apps web no pueden leer WhatsApp ni los SMS automáticamente: en la PWA se usa «Compartir → Centinela», pegar, captura o nota de voz. La siguiente fase es una app Android con `NotificationListenerService` para revisar los mensajes al llegar, con el mismo backend.
+diff --git a/backend/app/admin.py b/backend/app/admin.py
+new file mode 100644
+index 0000000..e54fd8f
+--- /dev/null
++++ b/backend/app/admin.py
+@@ -0,0 +1,35 @@
++"""Rutas de administración de la demo: solo desde el propio portátil.
++
++Idea tomada de la seguridad de la API local de hackaton-finance-antifraude (ADR 0013), simplificada: los
++lanzadores arrancan el servidor en 0.0.0.0 para que el móvil de la demo entre por la wifi, así que cualquiera
++en esa red podría reiniciar la demo, simular mensajes o liberar transferencias retenidas. Con esta dependencia,
++esas rutas solo responden a peticiones que llegan desde el propio ordenador (127.0.0.1 / ::1).
++
++- La app del cliente (analizar, transferir, ajustes) sigue funcionando desde el móvil.
++- Detrás de un túnel (cloudflared, ngrok) la petición llega desde 127.0.0.1 pero con cabeceras de reenvío:
++  se trata como remota.
++- ``ADMIN_REMOTO=1`` en el .env desactiva la protección (por ejemplo, si el panel del familiar se abre en
++  otro móvil). No se recomienda en una red compartida.
++"""
++from __future__ import annotations
++
++from fastapi import HTTPException, Request
++
++from .config import settings
++
++LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
++FORWARD_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip")
++
++
++def is_local(request: Request) -> bool:
++    host = request.client.host if request.client else ""
++    if host not in LOCAL_HOSTS:
++        return False
++    return not any(h in request.headers for h in FORWARD_HEADERS)
++
++
++def solo_admin(request: Request) -> None:
++    """Dependencia de FastAPI: 403 si la petición no viene del propio portátil."""
++    if settings.admin_remoto or is_local(request):
++        return
++    raise HTTPException(403, "Esta acción solo se puede hacer desde el ordenador de la demo")
+diff --git a/backend/app/agent.py b/backend/app/agent.py
+index d1089d7..04e6397 100644
+--- a/backend/app/agent.py
++++ b/backend/app/agent.py
+@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator
+ 
+ import anthropic
+ 
+-from . import tools
++from . import budget, tools
+ from .config import settings
+ from .rules import RuleResult
+ 
+@@ -135,6 +135,7 @@ class AgentError(RuntimeError):
+     pass
+ 
+ 
++MAX_TOKENS = 8000
+ _client: anthropic.AsyncAnthropic | None = None
+ 
+ 
+@@ -218,10 +219,14 @@ async def investigate(text: str, sender: str | None, channel: str, rules: RuleRe
+         kwargs = {}
+         if last_round:
+             kwargs["tool_choice"] = {"type": "none"}
++        try:
++            reserved = budget.reserve_claude(MAX_TOKENS)
++        except budget.BudgetExceeded as exc:
++            raise AgentError(str(exc)) from exc
+         try:
+             response = await client().beta.messages.create(
+                 model=settings.claude_model,
+-                max_tokens=8000,
++                max_tokens=MAX_TOKENS,
+                 system=SYSTEM_PROMPT,
+                 tools=TOOLS,
+                 messages=messages,
+@@ -234,6 +239,7 @@ async def investigate(text: str, sender: str | None, channel: str, rules: RuleRe
+             raise AgentError(f"Error de la API de Claude ({exc.status_code})") from exc
+         except anthropic.APIConnectionError as exc:
+             raise AgentError("No se pudo conectar con Claude") from exc
++        budget.settle_claude(reserved, getattr(response, "usage", None))
+ 
+         if response.stop_reason == "refusal":
+             raise AgentError("Claude no pudo analizar este mensaje")
+diff --git a/backend/app/budget.py b/backend/app/budget.py
+new file mode 100644
+index 0000000..e246055
+--- /dev/null
++++ b/backend/app/budget.py
+@@ -0,0 +1,124 @@
++"""Tope de gasto diario de las APIs de pago (Claude y ElevenLabs).
++
++Idea tomada del control de costes de hackaton-finance-antifraude (ai/budget.py), simplificada para la demo:
++
++- Antes de cada llamada se comprueba que queda margen. Si no queda, la llamada NO se hace: el análisis sigue
++  con el motor de reglas, la voz con la del navegador y el Escudo de llamada pasa el caso al analista (falla de
++  forma segura, como ya hacía si faltaba la clave).
++- Claude: límite de llamadas al día y de tokens al día. Los tokens de cada llamada se reservan por el peor caso
++  (``max_tokens``) antes de llamar y se ajustan con el ``usage`` real al terminar.
++- ElevenLabs: límite de caracteres de voz al día y de notas de voz transcritas al día.
++- El contador se guarda en un JSON fuera del repositorio (``~/.centinela/gasto.json`` o ``CENTINELA_GASTO_FILE``)
++  y se reinicia cada día. Nunca guarda textos ni claves: solo números.
++
++Es un freno local. El tope real de facturación se pone en la consola de Anthropic y en la de ElevenLabs.
++"""
++from __future__ import annotations
++
++import json
++import os
++import threading
++from datetime import date
++from pathlib import Path
++
++from .config import settings
++
++GASTO_FILE = Path(os.getenv("CENTINELA_GASTO_FILE") or (Path.home() / ".centinela" / "gasto.json"))
++_lock = threading.Lock()
++
++
++class BudgetExceeded(RuntimeError):
++    """Se ha alcanzado el tope diario: la llamada de pago no se hace."""
++
++
++def _empty() -> dict:
++    return {"dia": date.today().isoformat(), "claude_llamadas": 0, "claude_tokens": 0,
++            "voz_caracteres": 0, "transcripciones": 0}
++
++
++def _load() -> dict:
++    try:
++        data = json.loads(GASTO_FILE.read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        return _empty()
++    if not isinstance(data, dict) or data.get("dia") != date.today().isoformat():
++        return _empty()
++    base = _empty()
++    base.update({k: int(v) for k, v in data.items() if k in base and k != "dia" and isinstance(v, (int, float))})
++    return base
++
++
++def _save(data: dict) -> None:
++    try:
++        GASTO_FILE.parent.mkdir(parents=True, exist_ok=True)
++        tmp = GASTO_FILE.with_suffix(".tmp")
++        tmp.write_text(json.dumps(data), encoding="utf-8")
++        tmp.replace(GASTO_FILE)
++    except OSError:
++        pass  # si no se puede escribir, el contador sigue en memoria de esta llamada; no rompemos la demo
++
++
++def limits() -> dict:
++    return {
++        "claude_llamadas": settings.ia_max_llamadas_dia,
++        "claude_tokens": settings.ia_max_tokens_dia,
++        "voz_caracteres": settings.voz_max_caracteres_dia,
++        "transcripciones": settings.voz_max_transcripciones_dia,
++    }
++
++
++def status() -> dict:
++    """Uso de hoy frente a los topes (sin textos ni claves)."""
++    with _lock:
++        used = _load()
++    lim = limits()
++    return {"dia": used["dia"], "uso": {k: used[k] for k in lim}, "topes": lim}
++
++
++def reserve_claude(max_tokens: int) -> int:
++    """Apunta una llamada a Claude por el peor caso. Devuelve los tokens reservados."""
++    with _lock:
++        data = _load()
++        if data["claude_llamadas"] + 1 > settings.ia_max_llamadas_dia:
++            raise BudgetExceeded("Se ha alcanzado el tope diario de llamadas a la IA")
++        if data["claude_tokens"] + max_tokens > settings.ia_max_tokens_dia:
++            raise BudgetExceeded("Se ha alcanzado el tope diario de uso de la IA")
++        data["claude_llamadas"] += 1
++        data["claude_tokens"] += max_tokens
++        _save(data)
++    return max_tokens
++
++
++def settle_claude(reserved: int, usage) -> None:
++    """Sustituye la reserva por el uso real. Sin ``usage`` (error a mitad) se queda la reserva: peor caso."""
++    if usage is None:
++        return
++    real = 0
++    for name in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
++        value = getattr(usage, name, None)
++        if isinstance(value, int):
++            real += value
++    if real <= 0:
++        return
++    with _lock:
++        data = _load()
++        data["claude_tokens"] = max(0, data["claude_tokens"] - reserved + real)
++        _save(data)
++
++
++def reserve_voice(chars: int) -> None:
++    with _lock:
++        data = _load()
++        if data["voz_caracteres"] + chars > settings.voz_max_caracteres_dia:
++            raise BudgetExceeded("Se ha alcanzado el tope diario de voz")
++        data["voz_caracteres"] += chars
++        _save(data)
++
++
++def reserve_transcription() -> None:
++    with _lock:
++        data = _load()
++        if data["transcripciones"] + 1 > settings.voz_max_transcripciones_dia:
++            raise BudgetExceeded("Se ha alcanzado el tope diario de notas de voz")
++        data["transcripciones"] += 1
++        _save(data)
+diff --git a/backend/app/config.py b/backend/app/config.py
+index c3ebbf2..ac3c6d3 100644
+--- a/backend/app/config.py
++++ b/backend/app/config.py
+@@ -51,6 +51,16 @@ class Settings:
+     # Fuerza el modo sin IA (solo reglas). Útil para tests y si no hay red.
+     force_offline: bool = _bool("FORCE_OFFLINE", False)
+ 
++    # --- Tope de gasto diario (ver app/budget.py). Al llegar al tope: reglas / voz del navegador / analista ---
++    ia_max_llamadas_dia: int = int(os.getenv("IA_MAX_LLAMADAS_DIA", "500"))
++    ia_max_tokens_dia: int = int(os.getenv("IA_MAX_TOKENS_DIA", "4000000"))
++    voz_max_caracteres_dia: int = int(os.getenv("VOZ_MAX_CARACTERES_DIA", "30000"))
++    voz_max_transcripciones_dia: int = int(os.getenv("VOZ_MAX_TRANSCRIPCIONES_DIA", "100"))
++
++    # --- Rutas de administración de la demo (reiniciar, simular mensajes, decidir casos...) ---
++    # Por defecto solo responden desde el propio portátil. ADMIN_REMOTO=1 las abre a toda la red (no recomendado).
++    admin_remoto: bool = _bool("ADMIN_REMOTO", False)
++
+     @property
+     def claude_enabled(self) -> bool:
+         return bool(self.anthropic_api_key) and not self.force_offline
+diff --git a/backend/app/elevenlabs.py b/backend/app/elevenlabs.py
+index a0aadd3..b888dba 100644
+--- a/backend/app/elevenlabs.py
++++ b/backend/app/elevenlabs.py
+@@ -3,6 +3,7 @@ from __future__ import annotations
+ 
+ import httpx
+ 
++from . import budget
+ from .config import settings
+ 
+ API = "https://api.elevenlabs.io/v1"
+@@ -19,6 +20,10 @@ async def transcribe(audio: bytes, filename: str, mime: str) -> str:
+     """Convierte una nota de voz en texto con ElevenLabs Scribe."""
+     if not settings.elevenlabs_enabled:
+         raise ElevenLabsError("ElevenLabs no está configurado (falta ELEVENLABS_API_KEY).")
++    try:
++        budget.reserve_transcription()
++    except budget.BudgetExceeded as exc:
++        raise ElevenLabsError(str(exc)) from exc
+     async with httpx.AsyncClient(timeout=60) as client:
+         r = await client.post(
+             f"{API}/speech-to-text",
+@@ -35,6 +40,10 @@ async def synthesize(text: str, voice_id: str | None = None) -> bytes:
+     """Genera audio MP3 con una voz tranquila y clara para leer el veredicto."""
+     if not settings.elevenlabs_enabled:
+         raise ElevenLabsError("ElevenLabs no está configurado (falta ELEVENLABS_API_KEY).")
++    try:
++        budget.reserve_voice(len(text))
++    except budget.BudgetExceeded as exc:
++        raise ElevenLabsError(str(exc)) from exc
+     voice = voice_id or settings.elevenlabs_voice_id or DEFAULT_VOICE_ID
+     async with httpx.AsyncClient(timeout=30) as client:
+         r = await client.post(
+diff --git a/backend/app/llamada/agent.py b/backend/app/llamada/agent.py
+index 2e77a11..46c8288 100644
+--- a/backend/app/llamada/agent.py
++++ b/backend/app/llamada/agent.py
+@@ -16,6 +16,7 @@ from typing import Literal
+ import anthropic
+ from pydantic import BaseModel, ConfigDict, Field, ValidationError
+ 
++from .. import budget
+ from ..config import settings
+ from .risk import eur
+ 
+@@ -118,6 +119,7 @@ def render_turn(transfer: dict, signals: list[dict], transcript: list[dict]) ->
+ 
+ 
+ async def _attempt(client, prompt: str) -> dict:
++    reserved = budget.reserve_claude(2000)  # BudgetExceeded -> AgentUnavailable -> el caso pasa al analista
+     response = await asyncio.wait_for(client.messages.create(
+         model=MODEL,
+         max_tokens=2000,
+@@ -125,6 +127,7 @@ async def _attempt(client, prompt: str) -> dict:
+         messages=[{"role": "user", "content": prompt}],
+         output_config={"effort": "low", "format": {"type": "json_schema", "schema": ASSESSMENT_SCHEMA}},
+     ), timeout=TIMEOUT_S)
++    budget.settle_claude(reserved, getattr(response, "usage", None))
+     if response.stop_reason in {"refusal", "max_tokens"}:
+         raise ValueError(f"stop_reason={response.stop_reason}")
+     text = next((b.text for b in response.content if b.type == "text"), "")
+@@ -142,6 +145,9 @@ async def next_turn(transfer: dict, signals: list[dict], transcript: list[dict],
+     for _ in range(ATTEMPTS):
+         try:
+             return await _attempt(client, prompt)
++        except budget.BudgetExceeded as exc:
++            log.warning("Escudo de llamada sin IA: %s", exc)
++            raise AgentUnavailable(str(exc)) from exc
+         except (anthropic.APIError, asyncio.TimeoutError, ValueError, ValidationError) as exc:
+             # json.JSONDecodeError es subclase de ValueError
+             log.warning("Fallo del agente del escudo: %s", exc)
+diff --git a/backend/app/llamada/router.py b/backend/app/llamada/router.py
+index 51be8ea..c14d158 100644
+--- a/backend/app/llamada/router.py
++++ b/backend/app/llamada/router.py
+@@ -3,9 +3,10 @@ from __future__ import annotations
+ 
+ from typing import Annotated, Literal
+ 
+-from fastapi import APIRouter, HTTPException
++from fastapi import APIRouter, Depends, HTTPException
+ from pydantic import BaseModel, Field, StringConstraints
+ 
++from ..admin import solo_admin
+ from . import service
+ 
+ router = APIRouter(prefix="/api/llamada", tags=["escudo de llamada"])
+@@ -76,21 +77,21 @@ async def conversation_message(conv_id: str, body: ReplyIn):
+     return await _acall(service.reply, conv_id, body.text)
+ 
+ 
+-@router.get("/cases")
++@router.get("/cases", dependencies=[Depends(solo_admin)])
+ def cases():
+     return service.list_cases()
+ 
+ 
+-@router.post("/cases/{case_id}/decision")
++@router.post("/cases/{case_id}/decision", dependencies=[Depends(solo_admin)])
+ async def case_decision(case_id: str, body: DecisionIn):
+     return _call(service.analyst_decision, case_id, body.decision, body.actor)
+ 
+ 
+-@router.post("/demo/call")
++@router.post("/demo/call", dependencies=[Depends(solo_admin)])
+ def demo_call(body: CallIn):
+     return service.set_call(body.active)
+ 
+ 
+-@router.post("/demo/reset")
++@router.post("/demo/reset", dependencies=[Depends(solo_admin)])
+ def demo_reset():
+     return service.reset()
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 1107d39..33769f4 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -7,12 +7,13 @@ import json
+ import logging
+ import time
+ 
+-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
++from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+ from fastapi.staticfiles import StaticFiles
+ from pydantic import BaseModel, Field
+ 
+-from . import bank, elevenlabs, state as st, tools
++from . import bank, budget, elevenlabs, state as st, tools
++from .admin import solo_admin
+ from .analyzer import analyze, analyze_stream, notify_family
+ from .config import DATA_DIR, FRONTEND_DIR, settings
+ from .events import bus, sse_format
+@@ -182,13 +183,19 @@ async def voz(req: TTSRequest):
+     return Response(content=audio, media_type="audio/mpeg")
+ 
+ 
++@app.get("/api/gasto", dependencies=[Depends(solo_admin)])
++def gasto():
++    """Uso de hoy de las APIs de pago frente al tope diario (solo números)."""
++    return budget.status()
++
++
+ # ------------------------------------------------------------------ bandeja y demo
+ @app.get("/api/mensajes")
+ def mensajes():
+     return st.load()["mensajes"]
+ 
+ 
+-@app.post("/api/demo/entrante")
++@app.post("/api/demo/entrante", dependencies=[Depends(solo_admin)])
+ async def demo_entrante(m: Incoming):
+     """Simula que al móvil le llega un SMS/WhatsApp (para la demo en directo)."""
+     msg = {"id": st.new_id("msg"), "fecha": st.now_iso(), "canal": m.canal, "remitente": m.remitente, "texto": m.texto}
+@@ -207,7 +214,7 @@ def demo_ejemplos():
+     return json.loads((DATA_DIR / "demo_messages.json").read_text(encoding="utf-8"))
+ 
+ 
+-@app.post("/api/demo/reset")
++@app.post("/api/demo/reset", dependencies=[Depends(solo_admin)])
+ def demo_reset():
+     s = st.reset()
+     bus.publish_many(["usuario", "familia", "banco"], "reset", {})
+@@ -215,7 +222,7 @@ def demo_reset():
+ 
+ 
+ # ------------------------------------------------------------------ alertas y familia
+-@app.get("/api/alertas")
++@app.get("/api/alertas", dependencies=[Depends(solo_admin)])
+ def alertas():
+     return st.load()["alertas"]
+ 
+@@ -246,7 +253,7 @@ def transferencia(t: Transferencia):
+     return bank.request_transfer(t.beneficiario, t.iban, t.importe, t.concepto, t.canal)
+ 
+ 
+-@app.post("/api/banco/transferencias/{tx_id}/{accion}")
++@app.post("/api/banco/transferencias/{tx_id}/{accion}", dependencies=[Depends(solo_admin)])
+ def resolver(tx_id: str, accion: str):
+     if accion not in {"aprobar", "cancelar"}:
+         raise HTTPException(400, "Acción no válida")
+@@ -256,7 +263,7 @@ def resolver(tx_id: str, accion: str):
+     return tx
+ 
+ 
+-@app.post("/api/banco/escudo/{accion}")
++@app.post("/api/banco/escudo/{accion}", dependencies=[Depends(solo_admin)])
+ def escudo(accion: str):
+     if accion == "activar":
+         return bank.activate_shield("Activado manualmente")
+diff --git a/backend/app/rules.py b/backend/app/rules.py
+index f345075..2b64261 100644
+--- a/backend/app/rules.py
++++ b/backend/app/rules.py
+@@ -56,15 +56,18 @@ PATTERNS: list[tuple[str, str, int, list[str]]] = [
+     ]),
+     ("urgencia", "Mete prisa para que no pienses", 15, [
+         r"\b(urgente|urgentemente|inmediatamente|cuanto antes|hoy mismo|lo antes posible|ahora mismo|rapido|en las proximas \d+ ?(h|horas)|en \d+ ?(h|horas)|ultimo aviso|ultima oportunidad|de inmediato|antes de las)\b",
++        r"\b(antes de \d+ ?(minutos|min|horas|h)|en (los proximos|menos de) \d+ ?(minutos|min))\b",
+     ]),
+     ("amenaza", "Amenaza con bloqueos, multas o cortes", 20, [
+-        r"\b(bloquead[oa]s?|suspendid[oa]s?|cancelad[oa]s?|desactivad[oa]s?|restringid[oa]s?|embargo|recargo|sancion|multa|corte de suministro|se cerrara|perdera|caducad[oa])\b",
++        r"\b(bloquead[oa]s?|suspendid[oa]s?|cancelad[oa]s?|desactivad[oa]s?|restringid[oa]s?|embargo|recargo|sancion|multa|corte de suministro|se cerrara|perdera|caducad[oa]|se (cortara|suspendera|cancelara)|cortaremos|suspenderemos|no ha podido (cobrarse|cobrar))\b",
+     ]),
+     ("pide_dinero", "Te pide dinero (transferencia, Bizum, pago)", 25, [
+-        r"\b(transferencia|transfiere|transferir|bizum|hazme un ingreso|ingresa|ingresar|envia(me)? dinero|mandame|presta(me)?|dejame \d+|necesito \d+|pagar? (la|una) (tasa|factura|multa)|abone|abonar|realice el pago|pague)\b",
++        r"\b(transferencia|transfiere|transferir|bizum|hazme un ingreso|ingresa|ingresar|envia(me)? dinero|mandame|presta(me)?|dejame \d+|necesito \d+|pagar? (la|una) (tasa|factura|multa)|abone|abonar|realice el pago|pague|regularice (el pago|su deuda|la deuda|el importe))\b",
+     ]),
+     ("pide_credenciales", "Pide claves, códigos o datos de tu tarjeta", 35, [
+         r"\b(contrasena|clave|pin|cvv|cvc|codigo (que te|que le|de verificacion|sms|recibido)|numero de (la )?tarjeta|datos (de la tarjeta|bancarios|personales)|fecha de caducidad|coordenadas|dime el codigo|reenviame el codigo|facilitenos|confirme sus datos|verifique sus datos|verificar (su|tu) identidad|actualizar (sus|tus) datos)\b",
++        # «confirme su identidad con sus datos habituales de acceso» (falso gestor)
++        r"\b(confirm\w* (su|tu) identidad|(sus|tus) datos (habituales )?de acceso)\b",
+     ]),
+     ("secretismo", "Pide que no se lo cuentes a nadie", 25, [
+         r"(no se lo digas|que no se entere|no le digas nada|entre tu y yo|no lo cuentes|es un secreto|no llames a)",
+@@ -89,16 +92,40 @@ PATTERNS: list[tuple[str, str, int, list[str]]] = [
+     ]),
+     ("bizum_inverso", "Te pide aceptar un Bizum (eso sería enviar dinero, no recibirlo)", 30, [
+         r"(acepta(r)? (el|la) (bizum|solicitud)|para recibir el (pago|dinero)|te he enviado (un|una) solicitud|te mande por error|devuelvemelo)",
++        # «solicitud de Bizum/pago … para recibir/cobrar / reembolso / devolución … acéptela» (en cualquier orden)
++        r"solicitud(es)? de (bizum|pago|dinero|cobro)[^\n]{0,120}?\b(para (recibir|cobrar|que (se )?(te|le) (llegue|ingres))|reembols\w*|devoluc\w*|ingres\w*)[^\n]{0,120}?\b(acept|autoric|aprueb|aprob)\w*",
++        r"\b(para (recibir|cobrar)|reembols\w*|devoluc\w*)[^\n]{0,120}?\b(acept|autoric|aprueb|aprob)\w*[^\n]{0,40}\bsolicitud",
++        r"\b(acept|autoric|aprueb|aprob)\w*[^\n]{0,40}\bsolicitud(es)? de (bizum|pago|dinero|cobro)[^\n]{0,80}(para (recibir|cobrar|que (se )?(te|le) (llegue|ingres))|reembols|devoluc|ingres)",
++    ]),
++    ("cuenta_segura", "Te pide mover tu dinero a una «cuenta segura» (ningún banco lo pide)", 45, [
++        r"\bcuenta (segura|de seguridad|refugio|puente|protegida)\b",
++    ]),
++    ("cargo_no_reconocido", "Habla de un cargo o compra que no reconoces para asustarte", 20, [
++        r"(si no (reconoce|reconoces|ha realizado|has realizado) (esta|este|la|el) (operacion|compra|cargo|pago)|cargo no reconocido|compra no autorizada|operacion sospechosa)",
++    ]),
++    # Sin peso: los avisos reales de operaciones también dicen «si no has sido tú». Solo suma junto a un enlace
++    # para «anular» la operación (combo_cargo_enlace).
++    ("operacion_no_hecha", "Dice que se ha hecho una operación «por si no has sido tú»", 0, [
++        r"(si no (ha|has) sido (usted|tu)|si usted no (la|lo)? ?(ha realizado|ha autorizado|reconoce)|si no (la|lo) (reconoce|reconoces|ha autorizado|has autorizado))",
+     ]),
+ ]
+ 
+ LEGIT_PATTERNS: list[tuple[str, str, int, list[str]]] = [
+     ("aviso_no_compartir", "Incluye el aviso típico de mensajes legítimos («no compartas este código»)", -25, [
+         r"(no (lo )?compartas (este|el) codigo|nunca te (pediremos|llamaremos)|no lo facilites a nadie|nadie de .* te lo pedira)",
++        # mismas fórmulas con «usted» (los SMS reales de bancos y organismos suelen usarlo)
++        r"(no (lo|la) comparta (con nadie|este codigo)|no comparta (este|el|su) (codigo|contrasena|clave|pin)|nunca le (pediremos|llamaremos|pedira|solicitaremos)|ningun empleado (se lo|le) (pedira|solicitara)|no lo facilite a nadie)",
++        # consejos de seguridad: describen la estafa y dicen que NO se haga
++        r"(para (recibir|cobrar)[^.\n]{0,40}(nunca|no) (tiene|tienes|es necesario|hace falta|debe|debes)[^.\n]{0,15}acept|sin (tener que|necesidad de) acept|no (es necesario|hace falta) acept|(si recibe|si recibes)[^.\n]{0,80}, no (la|lo) (acepte|aceptes))",
+     ]),
+ ]
+ 
+ SHORT_OTP = re.compile(r"\b(codigo|code)\b.{0,60}\b\d{4,8}\b")
++#: Consejo, no petición: «si recibe una solicitud de Bizum para cobrar, NO la acepte». La negación suele ir
++#: después de «solicitud», dentro de lo que coincide con la regla del Bizum inverso.
++ACCEPT_NEGATED = re.compile(
++    r"\b(no|nunca|jamas)\s+((la|lo|las|los|le|se|debe|deben|tiene|tienes|hay|necesita|necesitas|que|es necesario|hace falta)\s+){0,3}"
++    r"(acept|autoric|aprueb|aprob)\w*|\bsin (tener que |necesidad de )?(acept|autoriz|aprob)\w*")
+ 
+ 
+ def _level(score: int) -> str:
+@@ -127,12 +154,20 @@ def analyze_rules(text: str, sender: str | None = None, contacts: list[dict] | N
+         if ev:
+             signals.append(Signal(sid, label, weight, ev))
+ 
++    # Bizum inverso dentro de un consejo («… no la acepte»): no es una petición
++    for s_ in [s_ for s_ in signals if s_.id == "bizum_inverso"]:
++        pos = norm.find(s_.evidence)
++        if ACCEPT_NEGATED.search(norm[max(0, pos - 40):pos + len(s_.evidence) + 5]):
++            signals.remove(s_)
++
+     ids = {s.id for s in signals}
+     # Combinaciones especialmente peligrosas
+     if {"familiar_numero_nuevo", "pide_dinero"} <= ids or ({"trato_familiar", "pide_dinero", "urgencia"} <= ids):
+         signals.append(Signal("combo_hijo_apuros", "Patrón del timo del «hijo en apuros»: familiar + dinero", 25))
+     if entities.urls and ids & {"premio", "pide_dinero", "pide_credenciales", "inversion_milagro"}:
+         signals.append(Signal("enlace_con_peticion", "Te manda a un enlace para pagar, reclamar algo o dar tus datos", 15))
++    if ids & {"cargo_no_reconocido", "operacion_no_hecha"} and entities.urls:
++        signals.append(Signal("combo_cargo_enlace", "Te asusta con una operación que no has hecho y te manda a un enlace para «anularla»", 35))
+     if "amenaza" in ids and (entities.urls or "llamada_a_enlace" in ids):
+         signals.append(Signal("combo_amenaza_enlace", "Amenaza y te manda a un enlace para «solucionarlo»", 15))
+     if "pide_credenciales" in ids and SHORT_OTP.search(norm) and "aviso_no_compartir" in ids:
+diff --git a/backend/tests/conftest.py b/backend/tests/conftest.py
+index 42903ff..d57e783 100644
+--- a/backend/tests/conftest.py
++++ b/backend/tests/conftest.py
+@@ -3,6 +3,7 @@ import sys
+ from pathlib import Path
+ 
+ os.environ["FORCE_OFFLINE"] = "1"  # tests deterministas: sin red ni API keys
++os.environ["ADMIN_REMOTO"] = "1"  # TestClient no llega desde 127.0.0.1; test_seguridad_gasto.py prueba la protección
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ 
+ import pytest  # noqa: E402
+@@ -11,8 +12,9 @@ import pytest  # noqa: E402
+ @pytest.fixture(autouse=True)
+ def isolated_state(tmp_path, monkeypatch):
+     """Cada test usa su propio estado y lista de reportes."""
+-    from app import state, tools
++    from app import budget, state, tools
+ 
+     monkeypatch.setattr(state, "STATE_FILE", tmp_path / "state.json")
++    monkeypatch.setattr(budget, "GASTO_FILE", tmp_path / "gasto.json")
+     monkeypatch.setattr(tools, "REPORTS_FILE", tmp_path / "reports.json")
+     yield
+diff --git a/backend/tests/test_rules_mejoras.py b/backend/tests/test_rules_mejoras.py
+new file mode 100644
+index 0000000..8afe679
+--- /dev/null
++++ b/backend/tests/test_rules_mejoras.py
+@@ -0,0 +1,87 @@
++"""Mejoras del motor de reglas (10-11-2026).
++
++Huecos encontrados con un sondeo de mensajes NUEVOS (no están en eval/dataset.jsonl), redactados a partir de
++tipologías públicas de estafa en España (avisos de INCIBE/OSI, Banco de España, Policía). Los escribió una IA:
++sirven como regresiones, no como evaluación independiente. Para no hacer trampa con la métrica, las reglas no
++se han ajustado a los mensajes de eval/dataset.jsonl.
++"""
++import pytest
++
++from app.rules import analyze_rules
++
++DESCONOCIDO = "+34711000999"
++
++BIZUM_INVERSO = [
++    "Le hemos enviado una solicitud de Bizum para recibir el reembolso de su compra en Wallapop. Acéptela en su app "
++    "para que se le ingrese el dinero.",
++    "Hola, ya te he pagado el artículo. Te llegará una solicitud de Bizum para cobrar los 45 €, solo tienes que "
++    "aceptarla y el dinero te entra en la cuenta.",
++    "Para completar la devolución, acepte la solicitud de pago de 120 € que le ha llegado para recibir su dinero.",
++    "Le hemos cobrado dos veces. Para la devolución del importe, autorice la solicitud de dinero que verá en su app.",
++    "Su reembolso está listo: apruebe la solicitud de cobro en Bizum para recibirlo hoy.",
++    # «no pierda…» no es una negación de «aceptar»
++    "No pierda su reembolso de 89 €: acepte la solicitud de Bizum que le hemos enviado para recibirlo.",
++]
++
++CONSEJOS = [
++    "Recuerde: si recibe una solicitud de Bizum para cobrar un reembolso, no la acepte. Para recibir dinero nunca "
++    "tiene que aceptar nada.",
++    "Consejo de seguridad: para recibir un Bizum no es necesario aceptar ninguna solicitud de pago.",
++    "Con Bizum puede recibir dinero sin tener que aceptar ninguna solicitud.",
++    "Su banco nunca le pedirá sus claves por SMS. No comparta su contraseña con nadie.",
++]
++
++
++@pytest.mark.parametrize("texto", BIZUM_INVERSO)
++def test_bizum_inverso_en_cualquier_orden(texto):
++    r = analyze_rules(texto, DESCONOCIDO, [])
++    assert "bizum_inverso" in {s.id for s in r.signals}, texto
++    assert r.level in ("amarillo", "rojo"), texto
++
++
++@pytest.mark.parametrize("texto", CONSEJOS)
++def test_consejos_de_seguridad_no_alertan(texto):
++    r = analyze_rules(texto, None, [])
++    assert "bizum_inverso" not in {s.id for s in r.signals}, texto
++    assert r.level == "verde", texto
++
++
++def test_otp_legitimo_con_usted_es_verde():
++    r = analyze_rules("Su código de verificación es 482913. No lo comparta con nadie. Ningún empleado se lo pedirá.",
++                      None, [])
++    assert r.level == "verde"
++    assert "pide_credenciales" not in {s.id for s in r.signals}
++
++
++def test_cuenta_segura_alerta():
++    r = analyze_rules("Su gestor de CaixaBank: para proteger sus ahorros de un ataque informático debe traspasarlos a "
++                      "una cuenta segura. Le llamaremos para indicarle el IBAN.", DESCONOCIDO, [])
++    assert "cuenta_segura" in {s.id for s in r.signals}
++    assert r.level in ("amarillo", "rojo")
++
++
++def test_cargo_no_reconocido_con_telefono_alerta():
++    r = analyze_rules("BBVA: se ha realizado un cargo de 899,00 EUR en su tarjeta. Si no reconoce esta operación, "
++                      "llame inmediatamente al 912 345 678.", None, [])
++    assert "cargo_no_reconocido" in {s.id for s in r.signals}
++    assert r.level in ("amarillo", "rojo")
++
++
++def test_corte_de_suministro_con_acortador_alerta():
++    r = analyze_rules("Iberdrola: su factura no ha podido cobrarse y el suministro se cortará mañana. Regularice el "
++                      "pago aquí: bit.ly/3xYzAb", None, [])
++    assert r.level in ("amarillo", "rojo")
++
++
++def test_saltos_de_linea_cortan_el_bizum_inverso():
++    texto = "Le enviamos una solicitud de pago por la cuota del club.\n\nAcepte el reglamento para recibir el carné."
++    assert "bizum_inverso" not in {s.id for s in analyze_rules(texto, None, []).signals}
++
++
++@pytest.mark.parametrize("texto", [
++    "Iberdrola: su factura de octubre de 54,20€ ya está disponible en su área de cliente.",
++    "Tu reembolso de 34,99 € ha sido procesado y lo verás en tu cuenta en 3-5 días hábiles.",
++    "Has recibido un Bizum de 15,00 EUR de LAURA G. Concepto: cena viernes.",
++])
++def test_notificaciones_reales_siguen_en_verde(texto):
++    assert analyze_rules(texto, None, []).level == "verde", texto
+diff --git a/backend/tests/test_seguridad_gasto.py b/backend/tests/test_seguridad_gasto.py
+new file mode 100644
+index 0000000..8cc294c
+--- /dev/null
++++ b/backend/tests/test_seguridad_gasto.py
+@@ -0,0 +1,196 @@
++"""Rutas de administración solo desde el portátil, tope de gasto diario y reglas nuevas (11-11-2026).
++
++Ideas tomadas de hackaton-finance-antifraude: seguridad de la API local (ADR 0013) y control de costes de la IA
++(ai/budget.py). Las reglas nuevas cubren dos huecos que el motor de antifraude sí detectaba; los mensajes de
++abajo están redactados de nuevo (no copiados de su conjunto de evaluación).
++"""
++import asyncio
++import json
++from datetime import date, timedelta
++from types import SimpleNamespace as NS
++
++import pytest
++from fastapi.testclient import TestClient
++
++from app import agent, budget, elevenlabs
++from app.config import settings
++from app.llamada import agent as llamada_agent
++from app.main import app
++from app.rules import analyze_rules
++
++ADMIN_POST = ["/api/demo/reset", "/api/llamada/demo/reset", "/api/banco/escudo/desactivar"]
++ADMIN_GET = ["/api/alertas", "/api/llamada/cases", "/api/gasto"]
++
++
++@pytest.fixture
++def protegido(monkeypatch):
++    monkeypatch.setattr(settings, "admin_remoto", False)
++
++
++# ------------------------------------------------------------------ rutas de administración
++@pytest.mark.parametrize("ruta", ADMIN_POST)
++def test_admin_post_bloqueado_desde_otro_dispositivo(protegido, ruta):
++    movil = TestClient(app, client=("192.168.1.50", 50000))
++    r = movil.post(ruta)
++    assert r.status_code == 403
++    assert "ordenador de la demo" in r.json()["detail"]
++
++
++@pytest.mark.parametrize("ruta", ADMIN_GET)
++def test_admin_get_bloqueado_desde_otro_dispositivo(protegido, ruta):
++    assert TestClient(app, client=("192.168.1.50", 50000)).get(ruta).status_code == 403
++
++
++def test_simular_mensaje_y_decidir_caso_bloqueados(protegido):
++    movil = TestClient(app, client=("10.0.0.7", 50000))
++    assert movil.post("/api/demo/entrante", json={"texto": "hola"}).status_code == 403
++    assert movil.post("/api/llamada/cases/x/decision", json={"decision": "release"}).status_code == 403
++    assert movil.post("/api/llamada/demo/call", json={"active": True}).status_code == 403
++    assert movil.post("/api/banco/transferencias/x/aprobar").status_code == 403
++
++
++def test_la_app_del_cliente_sigue_funcionando_desde_el_movil(protegido):
++    movil = TestClient(app, client=("192.168.1.50", 50000))
++    r = movil.post("/api/analizar", data={"texto": "Hola mamá, ¿comemos el domingo?", "remitente": "+34600111222"})
++    assert r.status_code == 200
++    assert movil.get("/api/perfil").status_code == 200
++    assert movil.get("/api/banco").status_code == 200
++    assert movil.get("/api/llamada/state").status_code == 200
++
++
++@pytest.mark.parametrize("host", ["127.0.0.1", "::1"])
++def test_admin_permitido_desde_el_portatil(protegido, host):
++    portatil = TestClient(app, client=(host, 50000))
++    assert portatil.post("/api/demo/reset").status_code == 200
++    assert portatil.get("/api/gasto").status_code == 200
++
++
++def test_tunel_se_trata_como_remoto(protegido):
++    """cloudflared/ngrok reenvían desde 127.0.0.1 pero añaden cabeceras de reenvío."""
++    tunel = TestClient(app, client=("127.0.0.1", 50000), headers={"X-Forwarded-For": "203.0.113.9"})
++    assert tunel.post("/api/demo/reset").status_code == 403
++
++
++def test_admin_remoto_desactiva_la_proteccion(monkeypatch):
++    monkeypatch.setattr(settings, "admin_remoto", True)
++    assert TestClient(app, client=("192.168.1.50", 50000)).post("/api/demo/reset").status_code == 200
++
++
++# ------------------------------------------------------------------ tope de gasto
++def test_tope_de_llamadas_a_claude(monkeypatch):
++    monkeypatch.setattr(settings, "ia_max_llamadas_dia", 2)
++    budget.reserve_claude(100)
++    budget.reserve_claude(100)
++    with pytest.raises(budget.BudgetExceeded):
++        budget.reserve_claude(100)
++    assert budget.status()["uso"]["claude_llamadas"] == 2
++
++
++def test_reserva_por_el_peor_caso_y_ajuste_con_el_uso_real(monkeypatch):
++    monkeypatch.setattr(settings, "ia_max_tokens_dia", 10_000)
++    reservado = budget.reserve_claude(8000)
++    assert budget.status()["uso"]["claude_tokens"] == 8000
++    with pytest.raises(budget.BudgetExceeded):  # no cabe otra llamada de peor caso
++        budget.reserve_claude(8000)
++    budget.settle_claude(reservado, NS(input_tokens=1200, output_tokens=300))
++    assert budget.status()["uso"]["claude_tokens"] == 1500
++    budget.reserve_claude(8000)  # ahora sí cabe
++
++
++def test_sin_usage_se_queda_la_reserva():
++    reservado = budget.reserve_claude(2000)
++    budget.settle_claude(reservado, None)
++    assert budget.status()["uso"]["claude_tokens"] == 2000
++
++
++def test_el_contador_se_reinicia_cada_dia():
++    ayer = (date.today() - timedelta(days=1)).isoformat()
++    budget.GASTO_FILE.write_text(json.dumps({"dia": ayer, "claude_llamadas": 999, "claude_tokens": 10**9,
++                                             "voz_caracteres": 10**9, "transcripciones": 999}))
++    assert budget.status()["uso"] == {"claude_llamadas": 0, "claude_tokens": 0, "voz_caracteres": 0, "transcripciones": 0}
++
++
++def test_el_contador_no_guarda_textos():
++    budget.reserve_voice(len("Cuidado: muy probablemente es una estafa"))
++    guardado = budget.GASTO_FILE.read_text()
++    assert "estafa" not in guardado and set(json.loads(guardado)) == {
++        "dia", "claude_llamadas", "claude_tokens", "voz_caracteres", "transcripciones"}
++
++
++def test_agente_sin_presupuesto_no_llama_a_claude(monkeypatch):
++    monkeypatch.setattr(settings, "ia_max_llamadas_dia", 0)
++
++    def no_llamar():
++        raise AssertionError("no debe llamar a Claude sin presupuesto")
++
++    monkeypatch.setattr(agent, "client", no_llamar)
++    rules = analyze_rules("Hola mamá, este es mi número nuevo", None, [])
++
++    async def consumir():
++        async for _ in agent.investigate("Hola mamá, este es mi número nuevo", None, "sms", rules, [], None):
++            pass
++
++    with pytest.raises(agent.AgentError, match="tope diario"):
++        asyncio.run(consumir())
++
++
++def test_escudo_de_llamada_sin_presupuesto_pasa_al_analista(monkeypatch):
++    monkeypatch.setattr(settings, "ia_max_llamadas_dia", 0)
++    llamadas = []
++
++    async def create(**kwargs):
++        llamadas.append(kwargs)
++
++    falso = NS(messages=NS(create=create))
++    with pytest.raises(llamada_agent.AgentUnavailable):
++        asyncio.run(llamada_agent.next_turn({"amount": 8500.0, "beneficiaryName": "X", "concept": ""}, [], [],
++                                            client=falso))
++    assert llamadas == []
++
++
++def test_voz_y_transcripcion_respetan_el_tope(monkeypatch):
++    monkeypatch.setattr(settings, "elevenlabs_api_key", "clave-falsa")
++    monkeypatch.setattr(settings, "force_offline", False)
++    monkeypatch.setattr(settings, "voz_max_caracteres_dia", 10)
++    monkeypatch.setattr(settings, "voz_max_transcripciones_dia", 0)
++    with pytest.raises(elevenlabs.ElevenLabsError, match="tope diario"):
++        asyncio.run(elevenlabs.synthesize("Este texto tiene más de diez caracteres"))
++    with pytest.raises(elevenlabs.ElevenLabsError, match="tope diario"):
++        asyncio.run(elevenlabs.transcribe(b"audio", "nota.ogg", "audio/ogg"))
++
++
++def test_voz_al_tope_responde_204_y_la_app_usa_la_voz_del_navegador(monkeypatch):
++    monkeypatch.setattr(settings, "elevenlabs_api_key", "clave-falsa")
++    monkeypatch.setattr(settings, "force_offline", False)
++    monkeypatch.setattr(settings, "voz_max_caracteres_dia", 0)
++    assert TestClient(app).post("/api/voz", json={"texto": "Hola"}).status_code == 204
++
++
++# ------------------------------------------------------------------ reglas nuevas
++@pytest.mark.parametrize("texto", [
++    "Se ha realizado un pago con Bizum de 350,00 EUR desde su cuenta. Si no ha sido usted, anule la operación "
++    "antes de 20 minutos en https://anular-pagos-bizum.top/cancelar",
++    "Compra de 612,00 EUR en MediaMarkt con su tarjeta. Si usted no la ha autorizado, cancélela aquí: "
++    "http://cancelar-compra.info/tarjeta",
++])
++def test_falso_cargo_con_enlace_para_anularlo(texto):
++    r = analyze_rules(texto, None, [])
++    assert "combo_cargo_enlace" in {s.id for s in r.signals}
++    assert r.level in ("amarillo", "rojo")
++
++
++def test_falso_gestor_pide_confirmar_identidad_con_datos_de_acceso():
++    texto = ("Estimado cliente: estamos renovando el registro de dispositivos de la banca online. Entre en nuestra "
++             "web y confirme su identidad con sus datos de acceso para seguir operando. Su gestor personal.")
++    r = analyze_rules(texto, None, [])
++    assert "pide_credenciales" in {s.id for s in r.signals}
++    assert r.level in ("amarillo", "rojo")
++
++
++@pytest.mark.parametrize("texto", [
++    # aviso real: «si no has sido tú» pero sin enlace, te manda a tu canal de siempre
++    "Has enviado un Bizum de 20,00 EUR a JAVIER M. Si no has sido tú, llama al número que aparece en tu tarjeta.",
++    "Pago con tarjeta de 34,90 EUR en Mercadona. Si no reconoce esta operación, contacte con su oficina.",
++])
++def test_aviso_real_de_operacion_sin_enlace_sigue_en_verde(texto):
++    assert analyze_rules(texto, None, []).level == "verde", texto
