@@ -148,7 +148,7 @@ cd .. && python eval/run_eval.py --modo reglas    # Modo determinista (gratuito)
 # El modo ia requiere un perfil configurable y autorización de gasto.
 ```
 
-Los resultados se guardan en `eval/resultados_<modo>.md`. Son métricas del banco de desarrollo. Para una evaluación independiente se necesita otro conjunto con etiquetas revisadas.
+Los resultados se guardan en `eval/resultados_<modo>.md`. Son métricas del banco de desarrollo. Para una evaluación independiente se necesita otro conjunto con etiquetas revisadas. Las reglas se han afinado viendo este mismo conjunto (por ejemplo, el caso 13, un falso cargo con teléfono, se detecta desde una regla añadida tras verlo), así que el resultado no es una medida independiente.
 
 ---
 

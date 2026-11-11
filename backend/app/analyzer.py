@@ -13,7 +13,7 @@ from . import bank, elevenlabs, state as st
 from .agent import AgentError, investigate
 from .config import settings
 from .events import bus
-from .rules import _actions, analyze_rules, explain_rules
+from .rules import RuleResult, _actions, analyze_rules, explain_rules
 
 log = logging.getLogger("centinela.analyzer")
 
@@ -22,17 +22,26 @@ IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
 _in_progress: set[str] = set()  # Reclamaciones del bucle ASGI de la demo, un solo proceso.
 
 
-def _merge_with_rules(verdict: dict, rules_level: str, strong_evidence: bool) -> dict:
-    """Red de seguridad: si hay pruebas objetivas fuertes (web que imita a un banco,
-    cuenta extranjera...) nunca devolvemos verde."""
-    if strong_evidence and verdict.get("nivel") == "verde":
+NOTA_RED_DE_SEGURIDAD = ("La IA no ha visto riesgo, pero nuestras comprobaciones automáticas sí: "
+                         "mejor comprobarlo antes de actuar.")
+
+
+def _merge_with_rules(verdict: dict, rules: RuleResult, strong_evidence: bool) -> tuple[dict, str]:
+    """Red de seguridad: la IA no puede dar por tranquilo (verde) un mensaje si
+    - hay pruebas objetivas fuertes (web que imita a un banco, cuenta extranjera...), o
+    - las reglas ya lo marcan en rojo (por ejemplo, el falso hijo que pide un Bizum urgente).
+    En ese caso manda el veredicto de las reglas entero, para que el nivel, el texto y la voz digan lo mismo.
+    Devuelve (veredicto, fuente)."""
+    if verdict.get("nivel") == "verde" and (strong_evidence or rules.level == "rojo"):
+        if rules.level != "verde":
+            v = explain_rules(rules)
+            v["pruebas"].append(NOTA_RED_DE_SEGURIDAD)
+            return v, "reglas"
         verdict["nivel"] = "amarillo"
         verdict["puntuacion"] = max(int(verdict.get("puntuacion", 0)), 40)
-        verdict.setdefault("pruebas", []).append(
-            "Nuestras comprobaciones automáticas han encontrado señales objetivas de riesgo, así que mejor comprobarlo antes de actuar."
-        )
+        verdict.setdefault("pruebas", []).append(NOTA_RED_DE_SEGURIDAD)
     verdict["puntuacion"] = max(0, min(100, int(verdict.get("puntuacion", 0))))
-    return verdict
+    return verdict, "ia"
 
 
 async def _compute_stream(
@@ -86,8 +95,7 @@ async def _compute_stream(
         try:
             async for ev in investigate(texto, remitente, canal, rules, contacts, family, image):
                 if ev["tipo"] == "veredicto":
-                    verdict = _merge_with_rules(ev["datos"], rules.level, strong)
-                    fuente = "ia"
+                    verdict, fuente = _merge_with_rules(ev["datos"], rules, strong)
                 else:
                     yield ev
         except AgentError as exc:
