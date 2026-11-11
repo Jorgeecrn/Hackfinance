@@ -172,9 +172,11 @@ Los resultados se guardan en `eval/resultados_<modo>.md`. Son métricas del banc
 
 Desarrollado para el **HackFinance · Madrid Engineering Week**.
 
-- Jorge — [GitHub]([https://github.com/](https://github.com/Jorgeecrn)) / [LinkedIn]([https://linkedin.com/](https://www.linkedin.com/in/jorge-carnerero/))
-- Colaborador 2 — [GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
-- Colaborador 3 — [GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
+- Diego Almajano -[GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
+- Alejandro Bolivar — [GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
+- Jorge Carnerero — [GitHub]([https://github.com/](https://github.com/Jorgeecrn)) / [LinkedIn]([https://linkedin.com/](https://www.linkedin.com/in/jorge-carnerero/))
+- Jonathan Flores — [GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
+- Álvaro Moran — [GitHub](https://github.com/) / [LinkedIn](https://linkedin.com/)
 
 ---
 
