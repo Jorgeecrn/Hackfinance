@@ -7,12 +7,13 @@ import json
 import logging
 import time
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import bank, elevenlabs, state as st, tools
+from . import bank, budget, elevenlabs, state as st, tools
+from .admin import solo_admin
 from .analyzer import analyze, analyze_stream, notify_family
 from .config import DATA_DIR, FRONTEND_DIR, settings
 from .events import bus, sse_format
@@ -182,13 +183,19 @@ async def voz(req: TTSRequest):
     return Response(content=audio, media_type="audio/mpeg")
 
 
+@app.get("/api/gasto", dependencies=[Depends(solo_admin)])
+def gasto():
+    """Uso de hoy de las APIs de pago frente al tope diario (solo números)."""
+    return budget.status()
+
+
 # ------------------------------------------------------------------ bandeja y demo
 @app.get("/api/mensajes")
 def mensajes():
     return st.load()["mensajes"]
 
 
-@app.post("/api/demo/entrante")
+@app.post("/api/demo/entrante", dependencies=[Depends(solo_admin)])
 async def demo_entrante(m: Incoming):
     """Simula que al móvil le llega un SMS/WhatsApp (para la demo en directo)."""
     msg = {"id": st.new_id("msg"), "fecha": st.now_iso(), "canal": m.canal, "remitente": m.remitente, "texto": m.texto}
@@ -207,7 +214,7 @@ def demo_ejemplos():
     return json.loads((DATA_DIR / "demo_messages.json").read_text(encoding="utf-8"))
 
 
-@app.post("/api/demo/reset")
+@app.post("/api/demo/reset", dependencies=[Depends(solo_admin)])
 def demo_reset():
     s = st.reset()
     bus.publish_many(["usuario", "familia", "banco"], "reset", {})
@@ -215,7 +222,7 @@ def demo_reset():
 
 
 # ------------------------------------------------------------------ alertas y familia
-@app.get("/api/alertas")
+@app.get("/api/alertas", dependencies=[Depends(solo_admin)])
 def alertas():
     return st.load()["alertas"]
 
@@ -246,7 +253,7 @@ def transferencia(t: Transferencia):
     return bank.request_transfer(t.beneficiario, t.iban, t.importe, t.concepto, t.canal)
 
 
-@app.post("/api/banco/transferencias/{tx_id}/{accion}")
+@app.post("/api/banco/transferencias/{tx_id}/{accion}", dependencies=[Depends(solo_admin)])
 def resolver(tx_id: str, accion: str):
     if accion not in {"aprobar", "cancelar"}:
         raise HTTPException(400, "Acción no válida")
@@ -256,7 +263,7 @@ def resolver(tx_id: str, accion: str):
     return tx
 
 
-@app.post("/api/banco/escudo/{accion}")
+@app.post("/api/banco/escudo/{accion}", dependencies=[Depends(solo_admin)])
 def escudo(accion: str):
     if accion == "activar":
         return bank.activate_shield("Activado manualmente")

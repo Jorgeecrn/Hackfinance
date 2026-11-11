@@ -16,6 +16,7 @@ from typing import Literal
 import anthropic
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from .. import budget
 from ..config import settings
 from .risk import eur
 
@@ -118,6 +119,7 @@ def render_turn(transfer: dict, signals: list[dict], transcript: list[dict]) -> 
 
 
 async def _attempt(client, prompt: str) -> dict:
+    reserved = budget.reserve_claude(2000)  # BudgetExceeded -> AgentUnavailable -> el caso pasa al analista
     response = await asyncio.wait_for(client.messages.create(
         model=MODEL,
         max_tokens=2000,
@@ -125,6 +127,7 @@ async def _attempt(client, prompt: str) -> dict:
         messages=[{"role": "user", "content": prompt}],
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": ASSESSMENT_SCHEMA}},
     ), timeout=TIMEOUT_S)
+    budget.settle_claude(reserved, getattr(response, "usage", None))
     if response.stop_reason in {"refusal", "max_tokens"}:
         raise ValueError(f"stop_reason={response.stop_reason}")
     text = next((b.text for b in response.content if b.type == "text"), "")
@@ -142,6 +145,9 @@ async def next_turn(transfer: dict, signals: list[dict], transcript: list[dict],
     for _ in range(ATTEMPTS):
         try:
             return await _attempt(client, prompt)
+        except budget.BudgetExceeded as exc:
+            log.warning("Escudo de llamada sin IA: %s", exc)
+            raise AgentUnavailable(str(exc)) from exc
         except (anthropic.APIError, asyncio.TimeoutError, ValueError, ValidationError) as exc:
             # json.JSONDecodeError es subclase de ValueError
             log.warning("Fallo del agente del escudo: %s", exc)

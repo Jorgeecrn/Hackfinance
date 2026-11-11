@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator
 
 import anthropic
 
-from . import tools
+from . import budget, tools
 from .config import settings
 from .rules import RuleResult
 
@@ -135,6 +135,7 @@ class AgentError(RuntimeError):
     pass
 
 
+MAX_TOKENS = 8000
 _client: anthropic.AsyncAnthropic | None = None
 
 
@@ -219,9 +220,13 @@ async def investigate(text: str, sender: str | None, channel: str, rules: RuleRe
         if last_round:
             kwargs["tool_choice"] = {"type": "none"}
         try:
+            reserved = budget.reserve_claude(MAX_TOKENS)
+        except budget.BudgetExceeded as exc:
+            raise AgentError(str(exc)) from exc
+        try:
             response = await client().beta.messages.create(
                 model=settings.claude_model,
-                max_tokens=8000,
+                max_tokens=MAX_TOKENS,
                 system=SYSTEM_PROMPT,
                 tools=TOOLS,
                 messages=messages,
@@ -234,6 +239,7 @@ async def investigate(text: str, sender: str | None, channel: str, rules: RuleRe
             raise AgentError(f"Error de la API de Claude ({exc.status_code})") from exc
         except anthropic.APIConnectionError as exc:
             raise AgentError("No se pudo conectar con Claude") from exc
+        budget.settle_claude(reserved, getattr(response, "usage", None))
 
         if response.stop_reason == "refusal":
             raise AgentError("Claude no pudo analizar este mensaje")

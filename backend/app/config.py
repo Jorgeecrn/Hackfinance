@@ -51,6 +51,16 @@ class Settings:
     # Fuerza el modo sin IA (solo reglas). Útil para tests y si no hay red.
     force_offline: bool = _bool("FORCE_OFFLINE", False)
 
+    # --- Tope de gasto diario (ver app/budget.py). Al llegar al tope: reglas / voz del navegador / analista ---
+    ia_max_llamadas_dia: int = int(os.getenv("IA_MAX_LLAMADAS_DIA", "500"))
+    ia_max_tokens_dia: int = int(os.getenv("IA_MAX_TOKENS_DIA", "4000000"))
+    voz_max_caracteres_dia: int = int(os.getenv("VOZ_MAX_CARACTERES_DIA", "30000"))
+    voz_max_transcripciones_dia: int = int(os.getenv("VOZ_MAX_TRANSCRIPCIONES_DIA", "100"))
+
+    # --- Rutas de administración de la demo (reiniciar, simular mensajes, decidir casos...) ---
+    # Por defecto solo responden desde el propio portátil. ADMIN_REMOTO=1 las abre a toda la red (no recomendado).
+    admin_remoto: bool = _bool("ADMIN_REMOTO", False)
+
     @property
     def claude_enabled(self) -> bool:
         return bool(self.anthropic_api_key) and not self.force_offline

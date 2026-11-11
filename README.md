@@ -181,6 +181,11 @@ eval/               conjunto etiquetado y script de evaluación
 docs/               plan de trabajo, pitch y documento de una cara
 ```
 
+## Seguridad y control de gasto
+
+- **Rutas de administración solo desde el portátil.** El servidor escucha en toda la wifi para que entre el móvil de la demo, pero reiniciar la demo, simular mensajes, ver las alertas, decidir casos del analista, activar o desactivar el escudo y consultar el gasto solo responden a peticiones desde el propio ordenador (`127.0.0.1`). Detrás de un túnel (cloudflared, ngrok) se tratan como remotas. La app del cliente (analizar, transferir, ajustes) funciona igual desde el móvil. Si necesitas abrir el panel del familiar en otro dispositivo, pon `ADMIN_REMOTO=true` en el `.env` (no recomendado en una red compartida).
+- **Tope de gasto diario.** Antes de cada llamada a Claude o a ElevenLabs se comprueba que queda margen (`IA_MAX_LLAMADAS_DIA`, `IA_MAX_TOKENS_DIA`, `VOZ_MAX_CARACTERES_DIA`, `VOZ_MAX_TRANSCRIPCIONES_DIA`). Al llegar al tope, el análisis sigue con el motor de reglas, la voz pasa a la del navegador y el Escudo de llamada envía el caso al analista. El contador está en `~/.centinela/gasto.json` (solo números, sin textos) y se consulta en `http://localhost:8000/api/gasto`. Es un freno local: el tope real de facturación se pone en la consola de cada proveedor.
+
 ## Limitaciones conocidas y siguientes pasos
 
 - Las apps web no pueden leer WhatsApp ni los SMS automáticamente: en la PWA se usa «Compartir → Centinela», pegar, captura o nota de voz. La siguiente fase es una app Android con `NotificationListenerService` para revisar los mensajes al llegar, con el mismo backend.

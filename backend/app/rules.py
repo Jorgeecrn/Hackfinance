@@ -56,15 +56,18 @@ PATTERNS: list[tuple[str, str, int, list[str]]] = [
     ]),
     ("urgencia", "Mete prisa para que no pienses", 15, [
         r"\b(urgente|urgentemente|inmediatamente|cuanto antes|hoy mismo|lo antes posible|ahora mismo|rapido|en las proximas \d+ ?(h|horas)|en \d+ ?(h|horas)|ultimo aviso|ultima oportunidad|de inmediato|antes de las)\b",
+        r"\b(antes de \d+ ?(minutos|min|horas|h)|en (los proximos|menos de) \d+ ?(minutos|min))\b",
     ]),
     ("amenaza", "Amenaza con bloqueos, multas o cortes", 20, [
-        r"\b(bloquead[oa]s?|suspendid[oa]s?|cancelad[oa]s?|desactivad[oa]s?|restringid[oa]s?|embargo|recargo|sancion|multa|corte de suministro|se cerrara|perdera|caducad[oa])\b",
+        r"\b(bloquead[oa]s?|suspendid[oa]s?|cancelad[oa]s?|desactivad[oa]s?|restringid[oa]s?|embargo|recargo|sancion|multa|corte de suministro|se cerrara|perdera|caducad[oa]|se (cortara|suspendera|cancelara)|cortaremos|suspenderemos|no ha podido (cobrarse|cobrar))\b",
     ]),
     ("pide_dinero", "Te pide dinero (transferencia, Bizum, pago)", 25, [
-        r"\b(transferencia|transfiere|transferir|bizum|hazme un ingreso|ingresa|ingresar|envia(me)? dinero|mandame|presta(me)?|dejame \d+|necesito \d+|pagar? (la|una) (tasa|factura|multa)|abone|abonar|realice el pago|pague)\b",
+        r"\b(transferencia|transfiere|transferir|bizum|hazme un ingreso|ingresa|ingresar|envia(me)? dinero|mandame|presta(me)?|dejame \d+|necesito \d+|pagar? (la|una) (tasa|factura|multa)|abone|abonar|realice el pago|pague|regularice (el pago|su deuda|la deuda|el importe))\b",
     ]),
     ("pide_credenciales", "Pide claves, códigos o datos de tu tarjeta", 35, [
         r"\b(contrasena|clave|pin|cvv|cvc|codigo (que te|que le|de verificacion|sms|recibido)|numero de (la )?tarjeta|datos (de la tarjeta|bancarios|personales)|fecha de caducidad|coordenadas|dime el codigo|reenviame el codigo|facilitenos|confirme sus datos|verifique sus datos|verificar (su|tu) identidad|actualizar (sus|tus) datos)\b",
+        # «confirme su identidad con sus datos habituales de acceso» (falso gestor)
+        r"\b(confirm\w* (su|tu) identidad|(sus|tus) datos (habituales )?de acceso)\b",
     ]),
     ("secretismo", "Pide que no se lo cuentes a nadie", 25, [
         r"(no se lo digas|que no se entere|no le digas nada|entre tu y yo|no lo cuentes|es un secreto|no llames a)",
@@ -89,16 +92,40 @@ PATTERNS: list[tuple[str, str, int, list[str]]] = [
     ]),
     ("bizum_inverso", "Te pide aceptar un Bizum (eso sería enviar dinero, no recibirlo)", 30, [
         r"(acepta(r)? (el|la) (bizum|solicitud)|para recibir el (pago|dinero)|te he enviado (un|una) solicitud|te mande por error|devuelvemelo)",
+        # «solicitud de Bizum/pago … para recibir/cobrar / reembolso / devolución … acéptela» (en cualquier orden)
+        r"solicitud(es)? de (bizum|pago|dinero|cobro)[^\n]{0,120}?\b(para (recibir|cobrar|que (se )?(te|le) (llegue|ingres))|reembols\w*|devoluc\w*|ingres\w*)[^\n]{0,120}?\b(acept|autoric|aprueb|aprob)\w*",
+        r"\b(para (recibir|cobrar)|reembols\w*|devoluc\w*)[^\n]{0,120}?\b(acept|autoric|aprueb|aprob)\w*[^\n]{0,40}\bsolicitud",
+        r"\b(acept|autoric|aprueb|aprob)\w*[^\n]{0,40}\bsolicitud(es)? de (bizum|pago|dinero|cobro)[^\n]{0,80}(para (recibir|cobrar|que (se )?(te|le) (llegue|ingres))|reembols|devoluc|ingres)",
+    ]),
+    ("cuenta_segura", "Te pide mover tu dinero a una «cuenta segura» (ningún banco lo pide)", 45, [
+        r"\bcuenta (segura|de seguridad|refugio|puente|protegida)\b",
+    ]),
+    ("cargo_no_reconocido", "Habla de un cargo o compra que no reconoces para asustarte", 20, [
+        r"(si no (reconoce|reconoces|ha realizado|has realizado) (esta|este|la|el) (operacion|compra|cargo|pago)|cargo no reconocido|compra no autorizada|operacion sospechosa)",
+    ]),
+    # Sin peso: los avisos reales de operaciones también dicen «si no has sido tú». Solo suma junto a un enlace
+    # para «anular» la operación (combo_cargo_enlace).
+    ("operacion_no_hecha", "Dice que se ha hecho una operación «por si no has sido tú»", 0, [
+        r"(si no (ha|has) sido (usted|tu)|si usted no (la|lo)? ?(ha realizado|ha autorizado|reconoce)|si no (la|lo) (reconoce|reconoces|ha autorizado|has autorizado))",
     ]),
 ]
 
 LEGIT_PATTERNS: list[tuple[str, str, int, list[str]]] = [
     ("aviso_no_compartir", "Incluye el aviso típico de mensajes legítimos («no compartas este código»)", -25, [
         r"(no (lo )?compartas (este|el) codigo|nunca te (pediremos|llamaremos)|no lo facilites a nadie|nadie de .* te lo pedira)",
+        # mismas fórmulas con «usted» (los SMS reales de bancos y organismos suelen usarlo)
+        r"(no (lo|la) comparta (con nadie|este codigo)|no comparta (este|el|su) (codigo|contrasena|clave|pin)|nunca le (pediremos|llamaremos|pedira|solicitaremos)|ningun empleado (se lo|le) (pedira|solicitara)|no lo facilite a nadie)",
+        # consejos de seguridad: describen la estafa y dicen que NO se haga
+        r"(para (recibir|cobrar)[^.\n]{0,40}(nunca|no) (tiene|tienes|es necesario|hace falta|debe|debes)[^.\n]{0,15}acept|sin (tener que|necesidad de) acept|no (es necesario|hace falta) acept|(si recibe|si recibes)[^.\n]{0,80}, no (la|lo) (acepte|aceptes))",
     ]),
 ]
 
 SHORT_OTP = re.compile(r"\b(codigo|code)\b.{0,60}\b\d{4,8}\b")
+#: Consejo, no petición: «si recibe una solicitud de Bizum para cobrar, NO la acepte». La negación suele ir
+#: después de «solicitud», dentro de lo que coincide con la regla del Bizum inverso.
+ACCEPT_NEGATED = re.compile(
+    r"\b(no|nunca|jamas)\s+((la|lo|las|los|le|se|debe|deben|tiene|tienes|hay|necesita|necesitas|que|es necesario|hace falta)\s+){0,3}"
+    r"(acept|autoric|aprueb|aprob)\w*|\bsin (tener que |necesidad de )?(acept|autoriz|aprob)\w*")
 
 
 def _level(score: int) -> str:
@@ -127,12 +154,20 @@ def analyze_rules(text: str, sender: str | None = None, contacts: list[dict] | N
         if ev:
             signals.append(Signal(sid, label, weight, ev))
 
+    # Bizum inverso dentro de un consejo («… no la acepte»): no es una petición
+    for s_ in [s_ for s_ in signals if s_.id == "bizum_inverso"]:
+        pos = norm.find(s_.evidence)
+        if ACCEPT_NEGATED.search(norm[max(0, pos - 40):pos + len(s_.evidence) + 5]):
+            signals.remove(s_)
+
     ids = {s.id for s in signals}
     # Combinaciones especialmente peligrosas
     if {"familiar_numero_nuevo", "pide_dinero"} <= ids or ({"trato_familiar", "pide_dinero", "urgencia"} <= ids):
         signals.append(Signal("combo_hijo_apuros", "Patrón del timo del «hijo en apuros»: familiar + dinero", 25))
     if entities.urls and ids & {"premio", "pide_dinero", "pide_credenciales", "inversion_milagro"}:
         signals.append(Signal("enlace_con_peticion", "Te manda a un enlace para pagar, reclamar algo o dar tus datos", 15))
+    if ids & {"cargo_no_reconocido", "operacion_no_hecha"} and entities.urls:
+        signals.append(Signal("combo_cargo_enlace", "Te asusta con una operación que no has hecho y te manda a un enlace para «anularla»", 35))
     if "amenaza" in ids and (entities.urls or "llamada_a_enlace" in ids):
         signals.append(Signal("combo_amenaza_enlace", "Amenaza y te manda a un enlace para «solucionarlo»", 15))
     if "pide_credenciales" in ids and SHORT_OTP.search(norm) and "aviso_no_compartir" in ids:

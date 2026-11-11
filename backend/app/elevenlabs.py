@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import httpx
 
+from . import budget
 from .config import settings
 
 API = "https://api.elevenlabs.io/v1"
@@ -19,6 +20,10 @@ async def transcribe(audio: bytes, filename: str, mime: str) -> str:
     """Convierte una nota de voz en texto con ElevenLabs Scribe."""
     if not settings.elevenlabs_enabled:
         raise ElevenLabsError("ElevenLabs no está configurado (falta ELEVENLABS_API_KEY).")
+    try:
+        budget.reserve_transcription()
+    except budget.BudgetExceeded as exc:
+        raise ElevenLabsError(str(exc)) from exc
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
             f"{API}/speech-to-text",
@@ -35,6 +40,10 @@ async def synthesize(text: str, voice_id: str | None = None) -> bytes:
     """Genera audio MP3 con una voz tranquila y clara para leer el veredicto."""
     if not settings.elevenlabs_enabled:
         raise ElevenLabsError("ElevenLabs no está configurado (falta ELEVENLABS_API_KEY).")
+    try:
+        budget.reserve_voice(len(text))
+    except budget.BudgetExceeded as exc:
+        raise ElevenLabsError(str(exc)) from exc
     voice = voice_id or settings.elevenlabs_voice_id or DEFAULT_VOICE_ID
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(

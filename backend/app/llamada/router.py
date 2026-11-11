@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StringConstraints
 
+from ..admin import solo_admin
 from . import service
 
 router = APIRouter(prefix="/api/llamada", tags=["escudo de llamada"])
@@ -76,21 +77,21 @@ async def conversation_message(conv_id: str, body: ReplyIn):
     return await _acall(service.reply, conv_id, body.text)
 
 
-@router.get("/cases")
+@router.get("/cases", dependencies=[Depends(solo_admin)])
 def cases():
     return service.list_cases()
 
 
-@router.post("/cases/{case_id}/decision")
+@router.post("/cases/{case_id}/decision", dependencies=[Depends(solo_admin)])
 async def case_decision(case_id: str, body: DecisionIn):
     return _call(service.analyst_decision, case_id, body.decision, body.actor)
 
 
-@router.post("/demo/call")
+@router.post("/demo/call", dependencies=[Depends(solo_admin)])
 def demo_call(body: CallIn):
     return service.set_call(body.active)
 
 
-@router.post("/demo/reset")
+@router.post("/demo/reset", dependencies=[Depends(solo_admin)])
 def demo_reset():
     return service.reset()
