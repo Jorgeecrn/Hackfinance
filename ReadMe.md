@@ -135,15 +135,7 @@ El lanzador escucha en `127.0.0.1` y abre Banco Demo. Usa el mismo portátil par
 
 El perfil local valida el host y el origen de las escrituras. Las rutas privadas y los canales SSE rechazan acceso remoto. Los eventos de familia anuncian el cambio con datos mínimos y el panel consulta el detalle por la API.
 
-### Guion de entrega
 
-1. Reinicia desde **Perfil → Herramientas de demo → Reiniciar toda la demo**. En **Transferir**, ejecuta el escenario 1 de **200 € a Javier**. La corriente pasa de **2.300 € a 2.100 €**.
-2. Desde el panel de mensajes, envía **Falso hijo con número nuevo**. Carmen ve la alerta y Lucía recibe un aviso en su panel.
-3. En Carmen, abre el escenario 2, cambia el beneficiario a «Mi hijo» y el importe a **150 €**. La operación queda en revisión. Lucía pulsa **Bloquear**. El saldo sigue en **2.100 €**.
-4. Reinicia para partir sin alerta previa. Activa **Llamada activa** en el presentador de llamada, traspasa **8.000 €** de ahorro a corriente y usa el escenario 3. Los **8.500 €** quedan pendientes en el panel del analista. La corriente conserva **10.300 €**.
-5. Comprueba un mensaje de texto manualmente en Protección. La demo muestra el resultado escrito y usa una voz local si está disponible. Capturas y transcripción quedan fuera del ensayo local.
-
----
 
 ## 🧪 Pruebas y Benchmark
 
