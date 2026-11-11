@@ -85,3 +85,23 @@ def test_saltos_de_linea_cortan_el_bizum_inverso():
 ])
 def test_notificaciones_reales_siguen_en_verde(texto):
     assert analyze_rules(texto, None, []).level == "verde", texto
+
+
+@pytest.mark.parametrize("text", [
+    "Su código de verificación es 482913. No lo comparta con nadie. Facilítenos el código.",
+    "Su código de verificación es 482913, no lo comparta, facilite el código por aquí.",
+    "Facilítenos su contraseña.",
+])
+def test_peticion_activa_no_queda_en_verde_con_aviso_o_contacto(text):
+    contact = {"telefono": DESCONOCIDO, "nombre": "Contacto de prueba"}
+    result = analyze_rules(text, DESCONOCIDO, [contact])
+    assert result.level in {"amarillo", "rojo"}
+    assert any(signal.id == "pide_credenciales" for signal in result.signals)
+
+
+def test_cuenta_segura_se_distingue_de_un_aviso_preventivo():
+    advice = "Nunca haga una transferencia a una cuenta segura que le dicte un desconocido."
+    request = "Haga una transferencia a una cuenta segura para proteger su dinero."
+    assert analyze_rules(advice).level == "verde"
+    assert analyze_rules(request).level in {"amarillo", "rojo"}
+    assert analyze_rules(advice + " Pero transfiera su saldo a una cuenta segura hoy.").level in {"amarillo", "rojo"}

@@ -22,6 +22,9 @@ def _bool(name: str, default: bool) -> bool:
 
 
 class Settings:
+    # El perfil de entrega prevalece sobre opciones heredadas de .env.
+    demo_local: bool = _bool("CENTINELA_DEMO_LOCAL", True)
+
     # --- Claude (Anthropic) ---
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     claude_model: str = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
@@ -37,7 +40,7 @@ class Settings:
     elevenlabs_stt_model: str = os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1")
 
     # --- Investigación externa (opcionales) ---
-    online_checks: bool = _bool("ONLINE_CHECKS", True)  # RDAP (antigüedad de dominio)
+    online_checks: bool = not demo_local and _bool("ONLINE_CHECKS", False)
     google_safe_browsing_key: str = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "")
 
     # --- Notificaciones (opcional): Telegram para avisar al familiar ---
@@ -49,7 +52,7 @@ class Settings:
     shield_amount_threshold: float = float(os.getenv("SHIELD_AMOUNT_THRESHOLD", "300"))
 
     # Fuerza el modo sin IA (solo reglas). Útil para tests y si no hay red.
-    force_offline: bool = _bool("FORCE_OFFLINE", False)
+    force_offline: bool = demo_local or _bool("FORCE_OFFLINE", True)
 
     # --- Tope de gasto diario (ver app/budget.py). Al llegar al tope: reglas / voz del navegador / analista ---
     ia_max_llamadas_dia: int = int(os.getenv("IA_MAX_LLAMADAS_DIA", "500"))
@@ -59,7 +62,7 @@ class Settings:
 
     # --- Rutas de administración de la demo (reiniciar, simular mensajes, decidir casos...) ---
     # Por defecto solo responden desde el propio portátil. ADMIN_REMOTO=1 las abre a toda la red (no recomendado).
-    admin_remoto: bool = _bool("ADMIN_REMOTO", False)
+    admin_remoto: bool = not demo_local and _bool("ADMIN_REMOTO", False)
 
     @property
     def claude_enabled(self) -> bool:
@@ -68,6 +71,11 @@ class Settings:
     @property
     def elevenlabs_enabled(self) -> bool:
         return bool(self.elevenlabs_api_key) and not self.force_offline
+
+
+    @property
+    def telegram_enabled(self) -> bool:
+        return bool(self.telegram_bot_token and self.telegram_chat_id) and not self.force_offline
 
 
 settings = Settings()

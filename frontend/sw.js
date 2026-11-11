@@ -1,6 +1,6 @@
 // Service worker de Banco Demo (con Centinela): hace la app instalable y que la interfaz cargue sin red.
 // El análisis siempre necesita conexión (no se cachea ninguna llamada a /api).
-const CACHE = "centinela-v3";
+const CACHE = "centinela-v4";
 const SHELL = [
   "/", "/index.html", "/styles.css", "/banco.css", "/manifest.webmanifest",
   "/js/common.js", "/js/banco/core.js", "/js/banco/app.js", "/js/banco/inicio.js", "/js/banco/perfil.js", "/js/banco/transferir.js", "/js/banco/proteccion.js",
@@ -13,7 +13,7 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("centinela-") && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

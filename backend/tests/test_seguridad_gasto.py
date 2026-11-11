@@ -30,7 +30,7 @@ def protegido(monkeypatch):
 # ------------------------------------------------------------------ rutas de administración
 @pytest.mark.parametrize("ruta", ADMIN_POST)
 def test_admin_post_bloqueado_desde_otro_dispositivo(protegido, ruta):
-    movil = TestClient(app, client=("192.168.1.50", 50000))
+    movil = TestClient(app, base_url="http://127.0.0.1", client=("192.168.1.50", 50000))
     r = movil.post(ruta)
     assert r.status_code == 403
     assert "ordenador de la demo" in r.json()["detail"]
@@ -38,42 +38,81 @@ def test_admin_post_bloqueado_desde_otro_dispositivo(protegido, ruta):
 
 @pytest.mark.parametrize("ruta", ADMIN_GET)
 def test_admin_get_bloqueado_desde_otro_dispositivo(protegido, ruta):
-    assert TestClient(app, client=("192.168.1.50", 50000)).get(ruta).status_code == 403
+    assert TestClient(app, base_url="http://127.0.0.1", client=("192.168.1.50", 50000)).get(ruta).status_code == 403
 
 
 def test_simular_mensaje_y_decidir_caso_bloqueados(protegido):
-    movil = TestClient(app, client=("10.0.0.7", 50000))
+    movil = TestClient(app, base_url="http://127.0.0.1", client=("10.0.0.7", 50000))
     assert movil.post("/api/demo/entrante", json={"texto": "hola"}).status_code == 403
     assert movil.post("/api/llamada/cases/x/decision", json={"decision": "release"}).status_code == 403
     assert movil.post("/api/llamada/demo/call", json={"active": True}).status_code == 403
     assert movil.post("/api/banco/transferencias/x/aprobar").status_code == 403
 
 
-def test_la_app_del_cliente_sigue_funcionando_desde_el_movil(protegido):
-    movil = TestClient(app, client=("192.168.1.50", 50000))
-    r = movil.post("/api/analizar", data={"texto": "Hola mamá, ¿comemos el domingo?", "remitente": "+34600111222"})
-    assert r.status_code == 200
-    assert movil.get("/api/perfil").status_code == 200
-    assert movil.get("/api/banco").status_code == 200
-    assert movil.get("/api/llamada/state").status_code == 200
+@pytest.mark.parametrize("ruta", ["/api/perfil", "/api/banco", "/api/llamada/state", "/api/mensajes",
+                                  "/api/eventos/familia", "/api/eventos/usuario", "/api/eventos/banco",
+                                  "/api/compartido/sin-id", "/openapi.json"])
+def test_lecturas_y_eventos_rechazados_desde_otro_dispositivo(ruta):
+    movil = TestClient(app, base_url="http://127.0.0.1", client=("192.168.1.50", 50000))
+    assert movil.get(ruta).status_code == 403
+
+
+@pytest.mark.parametrize(("metodo", "ruta"), [("PUT", "/api/perfil"), ("POST", "/api/llamada/transfers"),
+                                            ("POST", "/api/analizar"), ("POST", "/share-target")])
+def test_escrituras_rechazadas_antes_de_procesar_el_cuerpo(metodo, ruta):
+    movil = TestClient(app, base_url="http://127.0.0.1", client=("192.168.1.50", 50000))
+    assert movil.request(metodo, ruta).status_code == 403
+
+
+def test_host_ajeno_y_origen_ajeno_rechazados_en_loopback():
+    local = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    assert local.get("/api/perfil", headers={"Host": "ajeno.example"}).status_code == 400
+    assert local.post("/api/demo/reset", headers={"Origin": "http://127.0.0.1:9000"}).status_code == 403
+    assert local.post("/api/demo/reset", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    same_origin = {"Origin": "http://127.0.0.1:8000", "Sec-Fetch-Site": "same-origin"}
+    assert local.post("/api/demo/reset", headers=same_origin).status_code == 200
+    assert local.post("/api/analizar", data={"texto": "Hola"}, headers=same_origin).status_code == 200
+    share = local.post("/share-target", files={"text": (None, "Mensaje de prueba")}, headers=same_origin,
+                       follow_redirects=False)
+    assert share.status_code == 303
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "::1"])
 def test_admin_permitido_desde_el_portatil(protegido, host):
-    portatil = TestClient(app, client=(host, 50000))
+    portatil = TestClient(app, base_url="http://127.0.0.1", client=(host, 50000))
     assert portatil.post("/api/demo/reset").status_code == 200
     assert portatil.get("/api/gasto").status_code == 200
 
 
 def test_tunel_se_trata_como_remoto(protegido):
     """cloudflared/ngrok reenvían desde 127.0.0.1 pero añaden cabeceras de reenvío."""
-    tunel = TestClient(app, client=("127.0.0.1", 50000), headers={"X-Forwarded-For": "203.0.113.9"})
+    tunel = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000), headers={"X-Forwarded-For": "203.0.113.9"})
     assert tunel.post("/api/demo/reset").status_code == 403
 
 
-def test_admin_remoto_desactiva_la_proteccion(monkeypatch):
+def test_admin_remoto_no_desactiva_la_proteccion_del_perfil_local(monkeypatch):
     monkeypatch.setattr(settings, "admin_remoto", True)
-    assert TestClient(app, client=("192.168.1.50", 50000)).post("/api/demo/reset").status_code == 200
+    assert TestClient(app, base_url="http://127.0.0.1", client=("192.168.1.50", 50000)).post("/api/demo/reset").status_code == 403
+
+
+def test_configuracion_de_entrega_prevalece_sobre_variables_heredadas():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    env = {**os.environ, "CENTINELA_DEMO_LOCAL": "1", "ADMIN_REMOTO": "1", "FORCE_OFFLINE": "0",
+           "ONLINE_CHECKS": "1", "ANTHROPIC_API_KEY": "falsa", "ELEVENLABS_API_KEY": "falsa",
+           "TELEGRAM_BOT_TOKEN": "falso", "TELEGRAM_CHAT_ID": "falso", "PYTHONDONTWRITEBYTECODE": "1"}
+    code = """
+from app.config import settings
+assert settings.anthropic_api_key == "falsa" and settings.elevenlabs_api_key == "falsa"
+assert settings.telegram_bot_token == "falso"
+assert settings.demo_local and settings.force_offline
+assert not settings.online_checks and not settings.admin_remoto
+assert not settings.claude_enabled and not settings.elevenlabs_enabled and not settings.telegram_enabled
+"""
+    subprocess.run([sys.executable, "-c", code], env=env, cwd=Path(__file__).resolve().parents[1], check=True)
 
 
 # ------------------------------------------------------------------ tope de gasto
@@ -163,7 +202,7 @@ def test_voz_al_tope_responde_204_y_la_app_usa_la_voz_del_navegador(monkeypatch)
     monkeypatch.setattr(settings, "elevenlabs_api_key", "clave-falsa")
     monkeypatch.setattr(settings, "force_offline", False)
     monkeypatch.setattr(settings, "voz_max_caracteres_dia", 0)
-    assert TestClient(app).post("/api/voz", json={"texto": "Hola"}).status_code == 204
+    assert TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000)).post("/api/voz", json={"texto": "Hola"}).status_code == 204
 
 
 # ------------------------------------------------------------------ reglas nuevas

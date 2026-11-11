@@ -9,8 +9,6 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/banco.css">
 </head>
@@ -113,17 +111,17 @@
           <div id="hero" class="hero bk-hero" role="status">
             <div class="hero-shield"><div class="core"><svg class="i" id="hero-icon"><use href="/icons.svg#shield-check"/></svg></div></div>
             <h2 id="hero-title">Protección activada</h2>
-            <p id="hero-sub">Reviso tus mensajes nuevos y te aviso si hay peligro.</p>
+            <p id="hero-sub">Reviso los mensajes simulados de la demo y te aviso si hay señales de estafa.</p>
             <div class="stats" id="hero-stats"></div>
           </div>
 
           <div class="bk-card switch-row">
-            <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa los mensajes que te llegan y te avisa si son sospechosos.</span></div>
+            <div class="txt"><strong>Protección contra estafas</strong><span class="muted small">Revisa los mensajes simulados y te avisa si hay señales de estafa.</span></div>
             <label class="switch"><input type="checkbox" id="set-proteccion" aria-label="Protección contra estafas"><span class="track"></span></label>
           </div>
 
           <div id="shield-banner" class="banner shield hidden" role="status"></div>
-          <div id="basic-mode" class="banner hidden" role="status"><svg class="i"><use href="/icons.svg#alert"/></svg><span>Modo básico: sin conexión con la IA, compruebo los mensajes con reglas automáticas.</span></div>
+          <div id="basic-mode" class="banner hidden" role="status"><svg class="i"><use href="/icons.svg#alert"/></svg><span>Modo local de demostración: analiza texto con reglas automáticas. La IA externa está apagada.</span></div>
 
           <div class="actions bk-prot-actions">
             <button class="action-card primary" id="btn-check">
@@ -139,9 +137,9 @@
           </div>
 
           <div class="card">
-            <div class="card-title"><h2>Mensajes vigilados</h2><svg class="i muted"><use href="/icons.svg#inbox"/></svg></div>
-            <p class="muted small">Vigilar los SMS automáticamente requiere permiso de notificaciones (Android). Si no lo das, puedes comprobar cualquier mensaje a mano.</p>
-            <p class="muted small" id="inbox-help">Cuando la protección está activada, reviso solos los mensajes nuevos.</p>
+            <div class="card-title"><h2>Mensajes de demostración</h2><svg class="i muted"><use href="/icons.svg#inbox"/></svg></div>
+            <p class="muted small">El presentador envía mensajes simulados a esta bandeja. Para revisar otro mensaje, pega el texto en Comprobar un mensaje.</p>
+            <p class="muted small" id="inbox-help">Cuando la protección está activada, los mensajes simulados se revisan automáticamente.</p>
             <ul class="inbox" id="inbox" aria-live="polite"></ul>
           </div>
 
@@ -195,7 +193,7 @@
               <label class="switch"><input type="checkbox" id="set-voz" aria-label="Leer los avisos en voz alta"><span class="track"></span></label>
             </div>
             <div class="switch-row">
-              <div class="txt"><strong>Frenar pagos a cuentas nuevas tras un mensaje sospechoso</strong><span class="muted small">Durante un rato, Banco Demo revisará las transferencias a cuentas nuevas.</span></div>
+              <div class="txt"><strong>Frenar pagos a cuentas nuevas tras un mensaje sospechoso</strong><span class="muted small">Tras una alerta grave, Banco Demo envía a revisión los pagos a cuentas nuevas. Desactivar este ajuste evita nuevas activaciones.</span></div>
               <label class="switch"><input type="checkbox" id="set-escudo" aria-label="Frenar pagos a cuentas nuevas tras un mensaje sospechoso"><span class="track"></span></label>
             </div>
           </div>
@@ -260,7 +258,7 @@
             <a class="btn btn-outline" href="/llamada/analista.html" target="_blank"><svg class="i"><use href="/icons.svg#bank"/></svg> Analista</a>
             <a class="btn btn-outline" href="/familia.html" target="_blank"><svg class="i"><use href="/icons.svg#users"/></svg> Panel del familiar</a>
             <a class="btn btn-outline" href="/demo.html" target="_blank"><svg class="i"><use href="/icons.svg#message"/></svg> Panel de SMS de demo</a>
-            <a class="btn btn-outline" href="/docs" target="_blank"><svg class="i"><use href="/icons.svg#external"/></svg> Documentación de la API</a>
+            <a class="btn btn-outline" href="/openapi.json" target="_blank"><svg class="i"><use href="/icons.svg#external"/></svg> Esquema de la API</a>
           </div>
           <div class="actions"><button class="btn btn-danger bk-wide" id="reset-all"><svg class="i"><use href="/icons.svg#rotate"/></svg> Reiniciar toda la demo</button></div>
         </div>

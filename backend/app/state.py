@@ -56,6 +56,10 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
+def find_message(state: dict, message_id: str) -> dict | None:
+    return next((message for message in state["mensajes"] if message["id"] == message_id), None)
+
+
 def load() -> dict:
     with _lock:
         if not STATE_FILE.exists():

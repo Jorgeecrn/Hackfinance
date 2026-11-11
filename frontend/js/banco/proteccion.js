@@ -8,7 +8,6 @@ let analyzing = false;
 let shieldTimer = null;
 let draftContacts = []; // copia local: el sondeo de 2 s no debe borrar lo que se está editando
 let lastHero = null;
-const pending = []; // mensajes entrantes esperando análisis
 
 const profile = () => store.profile;
 
@@ -31,10 +30,10 @@ function renderProfile() {
   $("#hero-icon use").setAttribute("href", `/icons.svg#${on ? "shield-check" : "shield-off"}`);
   $("#hero-title").textContent = on ? "Protección activada" : "Protección desactivada";
   $("#hero-sub").textContent = on
-    ? "Reviso tus mensajes nuevos y te aviso si hay peligro."
+    ? "Reviso los mensajes simulados de la demo y te aviso si hay señales de estafa."
     : "Ahora mismo no reviso tus mensajes. Actívala con el interruptor.";
   $("#inbox-help").textContent = on
-    ? "La protección está activada: reviso solos los mensajes nuevos."
+    ? "La protección está activada: reviso los mensajes simulados nuevos."
     : "La protección está desactivada. Puedes activarla con el interruptor de arriba.";
 }
 
@@ -108,14 +107,18 @@ async function saveSettings() {
 }
 
 // ------------------------------------------------------------ bandeja
-async function loadInbox() {
+export async function loadInbox() {
   try {
     const msgs = await api("/api/mensajes");
     renderStats(msgs);
     $("#inbox").replaceChildren(...(msgs.length
       ? msgs.map(renderInboxItem)
       : [el("li", { class: "empty" }, icon("inbox"), "Todavía no hay mensajes.")]));
-  } catch (e) { console.warn(e); }
+    return msgs;
+  } catch (e) {
+    console.warn(e);
+    return [];
+  }
 }
 
 function renderStats(msgs) {
@@ -140,16 +143,13 @@ function renderInboxItem(m) {
         el("div", { class: "meta" }, el("span", { class: "from" }, m.remitente || "Desconocido"), el("span", { class: "time" }, fmtShort(m.fecha))),
         el("div", { class: "preview" }, m.texto),
         el("div", { class: "foot" },
-          el("span", { class: `chip-status ${level || ""}` }, level ? LEVEL[level].label : (on ? "Revisando…" : "Sin revisar")),
+          el("span", { class: `chip-status ${level || ""}` }, level ? LEVEL[level].label : (on ? "Pendiente" : "Sin revisar")),
           el("span", { class: "tag" }, CHANNEL[m.canal] || m.canal)))));
 }
 
 function openMessage(m) {
   if (m.resultado) { renderResult(m.resultado); show("result"); return; }
   const form = new FormData();
-  form.append("texto", m.texto);
-  form.append("remitente", m.remitente || "");
-  form.append("canal", m.canal || "sms");
   form.append("mensaje_id", m.id);
   runAnalysis(form, { visible: true });
 }
@@ -217,19 +217,24 @@ async function runAnalysis(form, { visible }) {
   if (visible) { $("#steps").replaceChildren(); show("progress"); }
   let result = null;
   let error = null;
+  let pending = false;
   try {
     await streamAnalysis(form, (ev) => {
       if (ev.tipo === "paso" && visible) addStep(ev);
       else if (ev.tipo === "resultado") result = ev.datos;
       else if (ev.tipo === "error") error = ev.texto;
+      else if (ev.tipo === "pendiente") pending = true;
     });
   } catch (e) {
     error = "No he podido conectar. Revisa la conexión a internet.";
   } finally {
     analyzing = false;
   }
-  if (error) {
-    if (visible) { toast(error, 5000); show("main"); }
+  if (error || !result) {
+    if (visible) {
+      toast(error || (pending ? "El mensaje ya se está revisando. Consulta la bandeja en unos segundos." : "No se ha recibido el resultado. Puedes volver a intentarlo."), 5000);
+      show("main");
+    }
     return null;
   }
   await loadInbox();
@@ -239,13 +244,13 @@ async function runAnalysis(form, { visible }) {
     show("result");
     if (profile()?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile().voz_id });
   }
-  processQueue();
   return result;
 }
 
 function verdictCard(result, { compact = false } = {}) {
   const v = result.veredicto;
-  const lv = LEVEL[v.nivel];
+  const level = result.limitacion && v.nivel === "verde" ? "amarillo" : v.nivel;
+  const lv = LEVEL[level];
   const p = profile();
   const fam = p?.familiar || {};
   const famName = fam.nombre || "tu familiar";
@@ -258,7 +263,7 @@ function verdictCard(result, { compact = false } = {}) {
     actions.append(el("button", { class: "btn btn-outline", onclick: async (e) => {
       const b = e.currentTarget;
       b.disabled = true;
-      try { await api(`/api/alertas/${result.alerta_id}/avisar`, { method: "POST" }); toast(`Hemos avisado a ${famName}`); }
+      try { await api(`/api/alertas/${result.alerta_id}/avisar`, { method: "POST" }); toast("Aviso publicado en el panel familiar"); }
       catch (err) { toast("No se ha podido avisar"); b.disabled = false; }
     } }, icon("message"), `Avisar a ${famName}`));
   }
@@ -276,6 +281,7 @@ function verdictCard(result, { compact = false } = {}) {
   const tools = v.herramientas_usadas || [];
   const evIcon = v.nivel === "verde" ? "check" : v.nivel === "rojo" ? "x" : "alert";
   const body = el("div", { class: "verdict-body" },
+    result.limitacion ? el("p", { class: "banner warn" }, result.limitacion) : null,
     el("p", {}, v.explicacion),
     v.pruebas?.length ? el("div", {}, el("h3", {}, "Lo que he comprobado"), el("ul", { class: "evidence" }, v.pruebas.map((x) => el("li", {}, icon(evIcon), el("span", {}, x))))) : null,
     el("p", { class: "advice" }, icon("sparkles"), el("span", {}, v.consejo)),
@@ -286,7 +292,7 @@ function verdictCard(result, { compact = false } = {}) {
       el("p", { class: "small muted" }, `Análisis con ${result.fuente === "ia" ? "IA (" + (v.modelo || "Claude") + ")" : "reglas automáticas"} en ${(result.latencia_ms / 1000).toFixed(1)} s.`),
       tools.length ? el("ul", { class: "small" }, tools.map((t) => el("li", {}, `${t.herramienta}: ${t.resumen}`))) : null,
       result.texto ? el("p", { class: "small muted" }, "Mensaje analizado: «" + result.texto.slice(0, 400) + "»") : null));
-  return el("article", { class: `card verdict ${v.nivel}`, "aria-live": "assertive" },
+  return el("article", { class: `card verdict ${level}`, "aria-live": "assertive" },
     el("header", { class: "verdict-head" },
       el("div", { class: "verdict-icon", "aria-hidden": "true" }, icon(lv.icon)),
       el("h2", { id: compact ? "overlay-title" : "result-title" }, v.titulo),
@@ -312,29 +318,15 @@ function showOverlay(result) {
   title.setAttribute("tabindex", "-1");
   title.focus({ preventScroll: true });
   card.scrollTop = 0;
-  if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-  if (profile()?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile().voz_id });
+  if (!document.hidden && navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+  if (!document.hidden && profile()?.leer_en_voz_alta) speak(result.veredicto.mensaje_voz, { voiceId: profile().voz_id });
 }
 function hideOverlay() { stopSpeaking(); $("#overlay").classList.add("hidden"); }
 
-async function processQueue() {
-  if (analyzing || !pending.length) return;
-  const m = pending.shift();
-  const form = new FormData();
-  form.append("texto", m.texto);
-  form.append("remitente", m.remitente || "");
-  form.append("canal", m.canal || "sms");
-  form.append("mensaje_id", m.id);
-  const res = await runAnalysis(form, { visible: false });
-  if (res && res.veredicto.nivel !== "verde") showOverlay(res);
-}
-
-export function onIncomingMessage(m) {
-  loadInbox();
-  if (!profile()?.proteccion_activa) return;
-  toast(`Nuevo mensaje de ${m.remitente || "desconocido"}: lo estoy revisando…`);
-  pending.push(m);
-  processQueue();
+export async function onAnalyzedMessage({ id, automatico }) {
+  const messages = await loadInbox();
+  const result = messages.find((message) => message.id === id)?.resultado;
+  if (automatico && result && result.veredicto.nivel !== "verde") showOverlay(result);
 }
 
 // ------------------------------------------------------------ contenido compartido (Web Share Target)
@@ -365,7 +357,16 @@ export function initProteccion() {
     const key = JSON.stringify(store.bank?.escudo || null);
     if (key !== lastShield) { lastShield = key; renderShield(); }
   });
-  $("#basic-mode").classList.toggle("hidden", store.health?.ia !== false);
+  $("#basic-mode").classList.toggle("hidden", store.health?.ia === true);
+  const imageAvailable = store.health?.ia === true;
+  const audioAvailable = store.health?.voz === true;
+  $('label[for="file-image"]').classList.toggle("hidden", !imageAvailable);
+  $('label[for="file-audio"]').classList.toggle("hidden", !audioAvailable);
+  $("#file-image").disabled = !imageAvailable;
+  $("#file-audio").disabled = !audioAvailable;
+  $("#btn-record").classList.toggle("hidden", !audioAvailable);
+  $("#btn-record-home").classList.toggle("hidden", !audioAvailable);
+  if (!imageAvailable && !audioAvailable) $("#btn-check .ac-sub").textContent = "Pega el texto para revisarlo";
 
   document.querySelectorAll('[data-tab="proteccion"], [data-goto="proteccion"]').forEach((b) => b.addEventListener("click", () => {
     if (!analyzing) { stopSpeaking(); showScreen("proteccion", "main"); }

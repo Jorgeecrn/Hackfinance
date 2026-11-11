@@ -30,10 +30,8 @@ const OPEN = ["retenida", "pendiente"];
 const STATUS_LABEL = { retenida: "Retenida", pendiente: "Pendiente" };
 
 async function loadCases() {
-  try {
-    const cases = await api("/api/llamada/cases");
-    held = cases.filter((c) => OPEN.includes(c.status));
-  } catch (e) { console.warn(e); }
+  const cases = await api("/api/llamada/cases");
+  held = cases.filter((c) => OPEN.includes(c.status));
   renderHeld();
   renderStats();
 }
@@ -72,18 +70,22 @@ async function resolve(id, decision, btn) {
     await api(`/api/llamada/cases/${id}/decision`, { method: "POST", json: { decision, actor: "familia" } });
     toast(decision === "block" ? "Transferencia bloqueada: el dinero no ha salido" : "Transferencia liberada");
   } catch (e) { toast(e.message); }
-  loadCases();
+  try { await loadCases(); }
+  catch (e) {
+    toast("No se han podido actualizar las transferencias");
+    btn?.parentElement?.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+  }
 }
 
-function alertItem(a, flash = false) {
+function alertItem(a) {
   const lv = LEVEL[a.nivel] || LEVEL.amarillo;
-  return el("li", { class: flash ? "new-flash" : "" },
+  return el("li", {},
     el("span", { class: `badge ${a.nivel}`, "aria-hidden": "true" }, icon(lv.icon)),
     el("div", { style: "min-width:0" },
       el("div", { class: "t-head" },
         el("strong", {}, a.titulo),
         el("span", { class: `chip-status ${a.nivel}` }, lv.label),
-        a.notificada ? el("span", { class: "tag" }, icon("send"), "Aviso enviado") : null),
+        a.notificada ? el("span", { class: "tag" }, icon("send"), "Aviso publicado en el panel") : null),
       el("div", { class: "t-meta" }, `${fmtTime(a.fecha)} · ${CHANNEL[a.canal] || a.canal || ""} · remitente: ${a.remitente || "desconocido"}`),
       el("p", { class: "t-body" }, a.resumen),
       a.texto ? el("details", {}, el("summary", {}, "Ver el mensaje"), el("p", { class: "quote" }, a.texto)) : null));
@@ -105,37 +107,47 @@ function notifyBrowser(title, body) {
   if (Notification.permission === "granted") new Notification(title, { body, icon: "/icons/icon-192.png" });
 }
 
-async function init() {
+function setLive(connected, text) {
+  $("#live").className = connected ? "pill on" : "pill warn";
+  $("#live").lastElementChild.textContent = text;
+}
+
+async function refreshPanel() {
+  try {
+    await Promise.all([loadProfile(), loadAlerts(), loadCases()]);
+    return true;
+  } catch (e) {
+    setLive(false, "No se han podido actualizar los datos");
+    return false;
+  }
+}
+
+function init() {
   if ("Notification" in window && Notification.permission === "default") {
     document.body.addEventListener("click", () => Notification.requestPermission(), { once: true });
   }
-  await Promise.all([loadProfile(), loadAlerts(), loadCases()]);
   const es = subscribe("familia", {
-    alerta: (a) => {
-      alerts = [a, ...alerts.filter((x) => x.id !== a.id)];
-      const ul = $("#alerts");
-      if (ul.firstElementChild?.classList.contains("empty")) ul.replaceChildren();
-      ul.prepend(alertItem(a, true));
-      renderStats();
+    alerta: refreshPanel,
+    aviso_familiar: () => {
+      toast("Hay un nuevo aviso en el panel familiar", 6000);
+      notifyBrowser("Centinela", "Hay un posible timo en el panel familiar.");
+      refreshPanel();
     },
-    aviso_familiar: (a) => {
-      toast(`${a.persona || "Tu familiar"} ha recibido un posible timo`, 6000);
-      notifyBrowser("Centinela: posible estafa", a.titulo);
-      loadAlerts();
-    },
-    caso: (c) => {
-      if (OPEN.includes(c.status)) {
-        toast(`Transferencia de ${fmtMoney(c.amount)} en revisión: decide si liberarla`, 6000);
-        notifyBrowser("Banco Demo: transferencia en revisión", `${fmtMoney(c.amount)} a ${c.beneficiaryName}`);
+    caso: ({ status }) => {
+      if (OPEN.includes(status)) {
+        toast("Hay una transferencia en revisión", 6000);
+        notifyBrowser("Banco Demo", "Hay una transferencia en revisión en el panel familiar.");
       }
-      loadCases();
+      refreshPanel();
     },
-    escudo: () => loadProfile(),
-    perfil: () => loadProfile(),
-    reset: () => location.reload(),
+    escudo: refreshPanel,
+    perfil: refreshPanel,
+    reset: refreshPanel,
   });
-  es.onopen = () => { $("#live").className = "pill on"; $("#live").lastElementChild.textContent = "En directo"; };
-  es.onerror = () => { $("#live").className = "pill warn"; $("#live").lastElementChild.textContent = "Reconectando…"; };
+  es.onopen = async () => {
+    if (await refreshPanel() && es.readyState === EventSource.OPEN) setLive(true, "En directo");
+  };
+  es.onerror = () => setLive(false, "Reconectando…");
 }
 
 init();

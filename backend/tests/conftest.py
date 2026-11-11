@@ -3,7 +3,8 @@ import sys
 from pathlib import Path
 
 os.environ["FORCE_OFFLINE"] = "1"  # tests deterministas: sin red ni API keys
-os.environ["ADMIN_REMOTO"] = "1"  # TestClient no llega desde 127.0.0.1; test_seguridad_gasto.py prueba la protección
+os.environ["CENTINELA_DEMO_LOCAL"] = "1"
+os.environ["ADMIN_REMOTO"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest  # noqa: E402

@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
 
 
 def test_health_offline():
@@ -86,3 +86,14 @@ def test_tts_without_elevenlabs_returns_204():
 def test_report_endpoint():
     r = client.post("/api/reportar", json={"telefonos": ["+34711234567"], "enlaces": ["https://estafa.xyz/a"]})
     assert r.json()["ok"] is True
+
+
+def test_texto_con_captura_sin_ia_identifica_cobertura_parcial():
+    response = client.post("/api/analizar", data={"texto": "Hola, foto adjunta."},
+                           files={"archivo": ("c.png", b"PNG sintetico", "image/png")})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["origen"] == "captura" and result["fuente"] == "reglas"
+    assert "captura queda sin revisar" in result["limitacion"]
+    assert result["limitacion"] in result["veredicto"]["mensaje_voz"]
+    assert client.get("/api/alertas").json() == []

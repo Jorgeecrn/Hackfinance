@@ -106,7 +106,7 @@ export function toast(text, ms = 3500) {
 }
 
 export const LEVEL = {
-  verde: { icon: "check-circle", label: "Seguro", color: "var(--verde)" },
+  verde: { icon: "check-circle", label: "Sin señales en lo revisado", color: "var(--verde)" },
   amarillo: { icon: "alert", label: "Cuidado", color: "var(--amarillo-accent)" },
   rojo: { icon: "octagon", label: "Timo", color: "var(--rojo)" },
 };
@@ -159,11 +159,12 @@ export async function speak(text, { voiceId } = {}) {
     console.warn("Voz ElevenLabs no disponible", e);
   }
   if ("speechSynthesis" in window) {
+    const voice = speechSynthesis.getVoices().find((v) => v.localService && v.lang?.startsWith("es"));
+    if (!voice) return; // El resultado escrito sigue disponible.
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "es-ES";
     u.rate = 0.92;
-    const voice = speechSynthesis.getVoices().find((v) => v.lang && v.lang.startsWith("es"));
-    if (voice) u.voice = voice;
+    u.voice = voice;
     speechSynthesis.speak(u);
   }
 }

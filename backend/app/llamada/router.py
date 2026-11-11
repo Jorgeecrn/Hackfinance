@@ -69,7 +69,7 @@ def internal_transfer(body: AmountIn):
 @router.post("/transfers")
 async def transfers(body: TransferIn):
     return await _acall(service.request_transfer, body.amount, body.iban, body.beneficiaryName.strip(),
-                        body.concept.strip(), body.context.callActive, body.context.ibanPasted)
+                        body.concept.strip(), body.context.ibanPasted)
 
 
 @router.post("/conversations/{conv_id}/messages")

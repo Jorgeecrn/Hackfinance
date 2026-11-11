@@ -14,6 +14,17 @@ CLOSING_TEXTS: dict[str, str] = {
 }
 
 
+MANDATORY_REVIEW_TEXT = "Tu dinero sigue en tu cuenta. La transferencia queda en revisión."
+
+
+def mandatory_review_rule(signal_ids: list[str]) -> str | None:
+    if "cuenta_destino_marcada" in signal_ids:
+        return "R6_cuenta_marcada"
+    if {"alerta_estafa_reciente", "beneficiario_nuevo"} <= set(signal_ids):
+        return "R7_escudo_destino_nuevo"
+    return None
+
+
 def hard_rule_applies(signal_ids: list[str], assessment: dict | None) -> bool:
     if not assessment or "llamada_activa" not in signal_ids:
         return False
@@ -33,6 +44,9 @@ def decide(signal_ids: list[str], assessment: dict | None, ready: bool) -> dict:
     reasons = _reasons(signal_ids, assessment)
     risk = assessment.get("risk") if assessment else None
 
+    review_rule = mandatory_review_rule(signal_ids)
+    if review_rule:
+        return {"action": "review", "rule": review_rule, "reasons": reasons}
     if hard_rule_applies(signal_ids, assessment):
         action, rule = "hold", "R1_suplantacion"
     elif risk == "high":

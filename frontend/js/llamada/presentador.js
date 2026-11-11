@@ -13,7 +13,7 @@ function render(s) {
   btn.className = callActive ? "btn btn-danger" : "btn btn-primary";
   btn.querySelector("span").textContent = callActive ? "Colgar" : "Activar";
   $("#no-key").classList.toggle("hidden", s.agentEnabled);
-  $("#model").textContent = s.agentEnabled ? `Agente: ${s.model}` : "Agente sin configurar";
+  $("#model").textContent = s.agentEnabled ? `Agente: ${s.model}` : "Agente externo apagado";
 }
 
 async function refresh() {

@@ -29,13 +29,13 @@ function setPhone(on) {
 $("#toggle-phone").addEventListener("change", (e) => setPhone(e.target.checked));
 
 async function init() {
-  // En pantallas estrechas el móvil no se ve: no lo cargamos para no analizar dos veces.
+  // En pantallas estrechas la vista previa no se muestra.
   setPhone(readPhonePref() && window.matchMedia("(min-width: 1001px)").matches);
 
   const h = await api("/api/health");
   $("#health").replaceChildren(
-    statusPill(h.ia, "IA", h.modelo, "modo básico (sin clave)"),
-    statusPill(h.voz, "Voz ElevenLabs", "activada", "voz del navegador"),
+    statusPill(h.ia, "IA", h.modelo, "modo local de demostración"),
+    statusPill(h.voz, "Voz ElevenLabs", "activada", "voz local si está disponible"),
     statusPill(h.telegram, "Telegram", "activado", "no configurado"),
   );
   const samples = await api("/api/demo/ejemplos");

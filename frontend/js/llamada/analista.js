@@ -19,6 +19,8 @@ const RULE_LABEL = {
   R3_riesgo_medio: "R3 · Riesgo medio: revisión por un analista",
   R4_riesgo_bajo: "R4 · Riesgo bajo: se ejecuta",
   R5_sin_decision: "R5 · Sin decisión del agente: revisión por un analista",
+  R6_cuenta_marcada: "R6 · Revisión humana por cuenta marcada",
+  R7_escudo_destino_nuevo: "R7 · Revisión humana por escudo activo y destinatario nuevo",
 };
 const OPEN = new Set(["retenida", "pendiente"]);
 
@@ -67,7 +69,7 @@ function renderDetail(c) {
         el("span", {}, el("strong", {}, "Riesgo: "), RISK_LABEL[a.risk] || a.risk),
         el("span", {}, el("strong", {}, "Tipo: "), TYPOLOGY_LABEL[a.typology] || a.typology),
         el("span", {}, el("strong", {}, "Alertas: "), a.redFlags.length ? a.redFlags.join(", ") : "ninguna"))
-      : el("p", { class: "muted" }, "Sin evaluación (el agente no respondió)."),
+      : el("p", { class: "muted" }, "Sin evaluación del agente."),
     el("h3", {}, "Conversación"),
     c.transcript.length
       ? el("div", { class: "ll-chat" }, c.transcript.map((t) => el("div", { class: `ll-msg ${t.role}` }, t.text)))
@@ -79,7 +81,7 @@ function renderDetail(c) {
       el("ul", { class: "muted small" }, c.decision.reasons.map((r) => el("li", {}, r))));
   }
   if (c.analystDecision) {
-    parts.push(el("p", { class: "small" }, `Analista: ${c.analystDecision.decision === "release" ? "liberada" : "bloqueada"} · ${fmtTime(c.analystDecision.ts)}`));
+    parts.push(el("p", { class: "small" }, `${c.analystDecision.actor === "familia" ? "Familia" : "Analista"}: ${c.analystDecision.decision === "release" ? "liberada" : "bloqueada"} · ${fmtTime(c.analystDecision.ts)}`));
   }
   if (OPEN.has(c.status)) {
     parts.push(el("div", { class: "actions row" },

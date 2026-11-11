@@ -5,6 +5,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 
 import httpx
 
@@ -18,6 +19,7 @@ log = logging.getLogger("centinela.analyzer")
 
 AUDIO_TYPES = ("audio/",)
 IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
+_in_progress: set[str] = set()  # Reclamaciones del bucle ASGI de la demo, un solo proceso.
 
 
 def _merge_with_rules(verdict: dict, rules_level: str, strong_evidence: bool) -> dict:
@@ -33,7 +35,7 @@ def _merge_with_rules(verdict: dict, rules_level: str, strong_evidence: bool) ->
     return verdict
 
 
-async def analyze_stream(
+async def _compute_stream(
     texto: str = "",
     remitente: str | None = None,
     canal: str = "sms",
@@ -91,18 +93,24 @@ async def analyze_stream(
         except AgentError as exc:
             log.warning("Fallo del agente, uso reglas: %s", exc)
             yield {"tipo": "paso", "texto": f"{exc}. Uso el análisis automático de respaldo.", "estado": "aviso"}
+    image_unchecked = bool(image and verdict is None)
     if verdict is None:
         if image and not texto:
             yield {"tipo": "error", "texto": "Para analizar capturas de pantalla hace falta la IA (configura ANTHROPIC_API_KEY)."}
             return
         verdict = explain_rules(rules)
 
+    limitation = None
+    if image_unchecked:
+        limitation = "Revisión parcial: analizamos el texto. La captura queda sin revisar."
+        verdict["mensaje_voz"] = f"{limitation} {verdict['mensaje_voz']}"
     verdict["acciones"] = _actions(verdict["nivel"])
     result = {
         "id": st.new_id("an"),
         "fecha": st.now_iso(),
         "fuente": fuente,
         "origen": origen,
+        "limitacion": limitation,
         "canal": canal,
         "remitente": remitente,
         "texto": texto,
@@ -112,38 +120,62 @@ async def analyze_stream(
         "detalle_reglas": rules.to_dict(),
     }
 
-    # Acciones de protección automáticas
-    if verdict["nivel"] in ("rojo", "amarillo"):
-        alert = _register_alert(result, perfil)
-        result["alerta_id"] = alert["id"]
-        if verdict["nivel"] == "rojo" and perfil.get("escudo_bancario", True):
-            bank.activate_shield(f"Posible estafa: {verdict.get('tipo_estafa') or verdict.get('titulo')}", alert["id"])
-            result["escudo_activado"] = True
-            yield {"tipo": "paso", "texto": "Escudo bancario activado: las transferencias a cuentas nuevas quedan en pausa", "estado": "hecho"}
-        if verdict["nivel"] == "rojo":
-            asyncio.create_task(notify_family(alert))
-    if mensaje_id:
-        _attach_to_message(mensaje_id, result)
-
     yield {"tipo": "resultado", "datos": result}
+
+
+async def analyze_stream(texto: str = "", remitente: str | None = None, canal: str = "sms",
+                         archivo: tuple[bytes, str, str] | None = None,
+                         mensaje_id: str | None = None, automatico: bool = False) -> AsyncIterator[dict]:
+    """Calcula el análisis y aplica sus efectos una vez para cada SMS guardado."""
+    if mensaje_id:
+        message = st.find_message(st.load(), mensaje_id)
+        if message is None:
+            yield {"tipo": "error", "texto": "El mensaje ya no está en la bandeja."}
+            return
+        if message.get("resultado"):
+            yield {"tipo": "resultado", "datos": message["resultado"]}
+            return
+        if mensaje_id in _in_progress:
+            yield {"tipo": "pendiente", "mensaje_id": mensaje_id}
+            return
+        texto, remitente, canal, archivo = message["texto"], message["remitente"], message["canal"], None
+        _in_progress.add(mensaje_id)
+
+    steps = []
+    try:
+        async for event in _compute_stream(texto, remitente, canal, archivo, mensaje_id):
+            if event["tipo"] == "paso":
+                steps.append(event)
+            if event["tipo"] == "resultado":
+                result = event["datos"]
+                result["pasos"] = steps
+                if not _record_result(result, automatico):
+                    yield {"tipo": "error", "texto": "El mensaje ya no está en la bandeja."}
+                    return
+            yield event
+    finally:
+        if mensaje_id:
+            _in_progress.discard(mensaje_id)
 
 
 async def analyze(**kwargs) -> dict:
     """Versión no streaming: devuelve solo el resultado final."""
     steps = []
-    async for ev in analyze_stream(**kwargs):
-        if ev["tipo"] == "resultado":
-            ev["datos"]["pasos"] = steps
-            return ev["datos"]
-        if ev["tipo"] == "error":
-            return {"error": ev["texto"], "pasos": steps}
-        steps.append(ev)
+    async with aclosing(analyze_stream(**kwargs)) as stream:
+        async for ev in stream:
+            if ev["tipo"] == "resultado":
+                return ev["datos"]
+            if ev["tipo"] == "pendiente":
+                return {"pendiente": True, "mensaje_id": ev["mensaje_id"]}
+            if ev["tipo"] == "error":
+                return {"error": ev["texto"], "pasos": steps}
+            steps.append(ev)
     return {"error": "Sin resultado", "pasos": steps}
 
 
-def _register_alert(result: dict, perfil: dict) -> dict:
+def _build_alert(result: dict, perfil: dict) -> dict:
     v = result["veredicto"]
-    alert = {
+    return {
         "id": st.new_id("al"),
         "fecha": result["fecha"],
         "nivel": v["nivel"],
@@ -157,28 +189,58 @@ def _register_alert(result: dict, perfil: dict) -> dict:
         "notificada": False,
     }
 
+def _record_result(result: dict, automatico: bool) -> bool:
+    mensaje_id = result["mensaje_id"]
+    verdict = result["veredicto"]
+    level = verdict["nivel"]
+
     def _do(s):
-        s["alertas"].insert(0, alert)
-        s["alertas"] = s["alertas"][:100]
+        message = st.find_message(s, mensaje_id) if mensaje_id else None
+        if mensaje_id and (message is None or message.get("resultado")):
+            return None
+        alert = shield = None
+        if level in {"rojo", "amarillo"}:
+            alert = _build_alert(result, s["perfil"])
+            result["alerta_id"] = alert["id"]
+            if level == "rojo" and not settings.telegram_enabled:
+                alert["notificada"] = True
+            s["alertas"].insert(0, alert)
+            s["alertas"] = s["alertas"][:100]
+            if level == "rojo" and s["perfil"].get("escudo_bancario", True):
+                shield = bank.new_shield(f"Posible estafa: {verdict.get('tipo_estafa') or verdict['titulo']}", alert["id"])
+                s["banco"]["escudo"] = shield
+                result["escudo_activado"] = True
+        if message is not None:
+            message["analisis"] = {"nivel": level, "titulo": verdict["titulo"], "id": result["id"]}
+            message["resultado"] = result
+        return alert, shield
 
-    st.update(_do)
-    bus.publish_many(["familia", "banco"], "alerta", alert)
-    return alert
-
-
-def _attach_to_message(mensaje_id: str, result: dict) -> None:
-    def _do(s):
-        for m in s["mensajes"]:
-            if m["id"] == mensaje_id:
-                m["analisis"] = {"nivel": result["veredicto"]["nivel"], "titulo": result["veredicto"]["titulo"], "id": result["id"]}
-                m["resultado"] = result
-
-    st.update(_do)
+    committed = st.update(_do)
+    if committed is None:
+        return False
+    alert, shield = committed
+    if alert:
+        bus.publish("familia", "alerta", {"id": alert["id"], "nivel": level})
+        bus.publish("banco", "alerta", alert)
+    if shield:
+        bank.publish_shield(shield)
+    if alert and level == "rojo":
+        if settings.telegram_enabled:
+            asyncio.create_task(notify_family(alert))
+        else:
+            bus.publish("familia", "aviso_familiar", {"id": alert["id"], "notificada": True})
+    if mensaje_id:
+        bus.publish("usuario", "analisis_mensaje", {"id": mensaje_id, "automatico": automatico})
+    return True
 
 
 async def notify_family(alert: dict) -> dict:
     """Avisa al familiar: siempre por el panel en tiempo real y, si está configurado, por Telegram."""
-    perfil = st.load()["perfil"]
+    snapshot = st.load()
+    registered = next((a for a in snapshot["alertas"] if a["id"] == alert["id"]), None)
+    if registered is None or registered.get("notificada"):
+        return {"id": alert["id"], "notificada": bool(registered and registered["notificada"]), "telegram": False}
+    perfil = snapshot["perfil"]
     fam = perfil.get("familiar") or {}
     text = (
         f"⚠️ Centinela: {perfil.get('nombre', 'Tu familiar')} ha recibido un posible timo.\n"
@@ -186,7 +248,7 @@ async def notify_family(alert: dict) -> dict:
         f"Remitente: {alert.get('remitente') or 'desconocido'}. Llámale para tranquilizarle."
     )
     sent_telegram = False
-    if settings.telegram_bot_token and settings.telegram_chat_id and not settings.force_offline:
+    if settings.telegram_enabled:
         try:
             async with httpx.AsyncClient(timeout=5) as c:
                 r = await c.post(
@@ -202,8 +264,11 @@ async def notify_family(alert: dict) -> dict:
             if a["id"] == alert["id"]:
                 a["notificada"] = True
                 a["notificada_a"] = fam.get("nombre")
+                return True
+        return False
 
-    st.update(_do)
+    if not st.update(_do):
+        return {"id": alert["id"], "notificada": False, "telegram": sent_telegram}
     payload = {**alert, "notificada": True, "telegram": sent_telegram, "mensaje": text}
-    bus.publish("familia", "aviso_familiar", payload)
+    bus.publish("familia", "aviso_familiar", {"id": alert["id"], "notificada": True})
     return payload

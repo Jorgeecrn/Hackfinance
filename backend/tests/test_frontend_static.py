@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.config import FRONTEND_DIR
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
 
 
 def _shell_paths() -> list[str]:
@@ -17,7 +17,7 @@ def _shell_paths() -> list[str]:
 
 def test_sw_shell_files_exist():
     sw = (FRONTEND_DIR / "sw.js").read_text(encoding="utf-8")
-    assert "centinela-v3" in sw
+    assert "centinela-v4" in sw
     for path in _shell_paths():
         rel = "index.html" if path == "/" else path.lstrip("/")
         assert (FRONTEND_DIR / rel).is_file(), f"sw.js cachea un archivo que no existe: {path}"
@@ -48,7 +48,7 @@ def test_presenter_links_app_root():
 def test_app_has_protection_copy():
     html = client.get("/").text
     assert "con tecnología Centinela" in html
-    assert "requiere permiso de notificaciones (Android)" in html
+    assert "Mensajes de demostración" in html
 
 
 def test_share_target_redirects_to_app():
@@ -76,3 +76,11 @@ def test_case_decision_route_runs_on_event_loop():
     import inspect
     from app.llamada import router as llamada_router
     assert inspect.iscoroutinefunction(llamada_router.case_decision)
+
+
+def test_demo_local_no_carga_fuentes_de_red():
+    for path in ("/", "/familia.html", "/demo.html", "/styles.css"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "fonts.googleapis.com" not in response.text
+        assert "fonts.gstatic.com" not in response.text

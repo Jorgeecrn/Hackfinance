@@ -121,6 +121,21 @@ LEGIT_PATTERNS: list[tuple[str, str, int, list[str]]] = [
 ]
 
 SHORT_OTP = re.compile(r"\b(codigo|code)\b.{0,60}\b\d{4,8}\b")
+CLAUSE_BREAK = re.compile(r"[.!?;]+[ \t]*|\n+|,\s+|\b(?:pero|sin embargo)\b")
+CREDENTIAL_REQUEST = re.compile(
+    r"\b(?:dime|digame|diganos|facilita(?:me|nos)?|facilite(?:me|nos)?|"
+    r"envia(?:me|nos)?|envie(?:me|nos)?|reenvia(?:me|nos)?|reenvie(?:me|nos)?|"
+    r"comparte|comparta|proporciona(?:me|nos)?|proporcione(?:me|nos)?)"
+    r"\s+(?:(?:el|la|los|las|tu|tus|su|sus|este)\s+)?"
+    r"(?:codigos?|contrasenas?|claves?|pin|cvv|cvc)\b"
+)
+NEGATED_REQUEST = re.compile(r"\b(?:no|nunca|jamas)\s+(?:(?:lo|la|le|te|me|nos)\s+){0,3}$")
+SAFE_ACCOUNT_ADVICE = re.compile(
+    r"\b(?:no|nunca|jamas)\s+(?:(?:haga|hagas|realice|realices|debe|debes|"
+    r"pedira|pediremos|le|te|que)\s+){0,4}(?:una\s+)?"
+    r"(?:transferencia|transfier\w*|transferir|muev\w*|mover|traspas\w*)\b"
+)
+
 #: Consejo, no petición: «si recibe una solicitud de Bizum para cobrar, NO la acepte». La negación suele ir
 #: después de «solicitud», dentro de lo que coincide con la regla del Bizum inverso.
 ACCEPT_NEGATED = re.compile(
@@ -149,8 +164,30 @@ def analyze_rules(text: str, sender: str | None = None, contacts: list[dict] | N
     entities = extract_entities(text)
     signals: list[Signal] = []
 
+    clauses = CLAUSE_BREAK.split(norm)
+    active_request = next((
+        match.group(0)
+        for clause in clauses
+        for match in CREDENTIAL_REQUEST.finditer(clause)
+        if not NEGATED_REQUEST.search(clause[:match.start()])
+    ), None)
+    advice_patterns = LEGIT_PATTERNS[0][3]
+    credential_text = norm
+    if SHORT_OTP.search(norm) and _match(advice_patterns, norm):
+        credential_text = "\n".join(clause for clause in clauses
+                                    if not SHORT_OTP.search(clause) and not _match(advice_patterns, clause))
+    payment_text = "\n".join(
+        clause for clause in clauses
+        if not ("cuenta " in clause and SAFE_ACCOUNT_ADVICE.search(clause))
+    )
+
     for sid, label, weight, patterns in PATTERNS + LEGIT_PATTERNS:
-        ev = _match(patterns, norm)
+        if sid == "pide_credenciales":
+            ev = active_request or _match(patterns, credential_text)
+        elif sid in {"pide_dinero", "cuenta_segura"}:
+            ev = _match(patterns, payment_text)
+        else:
+            ev = _match(patterns, norm)
         if ev:
             signals.append(Signal(sid, label, weight, ev))
 
@@ -170,10 +207,6 @@ def analyze_rules(text: str, sender: str | None = None, contacts: list[dict] | N
         signals.append(Signal("combo_cargo_enlace", "Te asusta con una operación que no has hecho y te manda a un enlace para «anularla»", 35))
     if "amenaza" in ids and (entities.urls or "llamada_a_enlace" in ids):
         signals.append(Signal("combo_amenaza_enlace", "Amenaza y te manda a un enlace para «solucionarlo»", 15))
-    if "pide_credenciales" in ids and SHORT_OTP.search(norm) and "aviso_no_compartir" in ids:
-        # SMS legítimo con código: no debe penalizarse como petición de credenciales
-        signals = [s for s in signals if s.id != "pide_credenciales"]
-
     # Remitente
     sender_report = None
     if sender:
@@ -219,7 +252,8 @@ def analyze_rules(text: str, sender: str | None = None, contacts: list[dict] | N
         signals.append(Signal("campana_conocida", f"Se parece a una estafa conocida: {campaigns[0]['nombre']}", 15, campaigns[0]["id"]))
 
     score = sum(s.weight for s in signals)
-    score = max(0, min(100, score))
+    # Un aviso de seguridad o un número guardado no anula una petición explícita.
+    score = max(30 if active_request else 0, min(100, score))
     return RuleResult(score, _level(score), signals, entities, url_reports, phone_reports, iban_reports, campaigns, sender_report)
 
 
@@ -232,11 +266,11 @@ def explain_rules(res: RuleResult) -> dict:
     elif res.level == "amarillo":
         titulo = "Cuidado: este mensaje tiene señales sospechosas"
     else:
-        titulo = "No vemos señales de estafa"
+        titulo = "Sin señales en lo revisado"
     pruebas = [s.label + (f" ({s.evidence})" if s.evidence and s.id.startswith(("enlace", "iban", "dominio")) else "") for s in risky[:5]]
     if res.level == "verde":
-        pruebas = [s.label for s in res.signals if s.weight < 0] or ["No hemos encontrado peticiones de dinero, claves ni enlaces peligrosos."]
-        resumen = "No hemos encontrado peticiones de dinero, claves ni enlaces peligrosos."
+        resumen = "En el texto revisado no hemos encontrado señales suficientes para avisarte."
+        pruebas = [s.label for s in risky[:5]] or [s.label for s in res.signals if s.weight < 0] or [resumen]
     else:
         principales = [s.label[0].lower() + s.label[1:] for s in risky[:3]]
         resumen = "Hemos visto estas señales de alarma: " + (", ".join(principales[:-1]) + " y " + principales[-1] if len(principales) > 1 else principales[0]) + "."

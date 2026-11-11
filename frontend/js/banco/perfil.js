@@ -1,6 +1,6 @@
 // Pestaña Perfil: datos de la clienta, tema y herramientas de demo (solo para el equipo).
 import { api, getTheme, initials, setTheme, toast } from "../common.js";
-import { BASE, onRefresh } from "./core.js";
+import { onRefresh } from "./core.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -23,7 +23,6 @@ export function initPerfil() {
   $("#reset-all").addEventListener("click", async () => {
     try {
       await api("/api/demo/reset", { method: "POST" });
-      await api(`${BASE}/demo/reset`, { method: "POST" });
       toast("Demo reiniciada");
       setTimeout(() => location.reload(), 600);
     } catch (e) { toast(e.message); }

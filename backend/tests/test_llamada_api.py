@@ -6,7 +6,7 @@ from app.llamada import agent, seed, store
 from app.llamada.policy import CLOSING_TEXTS
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
 BASE = "/api/llamada"
 
 
@@ -53,8 +53,9 @@ def fake_agent(monkeypatch):
 
 def transfer(preset, call=False, **over):
     p = {**seed.PRESETS[preset], **over}
+    assert client.post(f"{BASE}/demo/call", json={"active": call}).status_code == 200
     body = {"amount": p["amount"], "iban": p["iban"], "beneficiaryName": p["beneficiaryName"],
-            "concept": p["concept"], "context": {"callActive": call, "ibanPasted": p["ibanPasted"]}}
+            "concept": p["concept"], "context": {"ibanPasted": p["ibanPasted"]}}
     return client.post(f"{BASE}/transfers", json=body)
 
 
@@ -73,7 +74,6 @@ def cases():
 def open_estafa_case(fake_agent, second):
     calls = fake_agent([A("medium"), second])
     assert client.post(f"{BASE}/internal-transfer", json={"amount": 8000}).status_code == 200
-    client.post(f"{BASE}/demo/call", json={"active": True})
     r = transfer("estafa", call=True)
     assert r.status_code == 200 and r.json()["status"] == "on_hold"
     return r.json(), calls
@@ -256,15 +256,58 @@ def sms_alert():
     assert r.status_code == 200 and r.json()["escudo_activado"] is True
 
 
-def test_sms_alert_then_new_beneficiary_goes_to_agent(fake_agent):
-    fake_agent([A("medium")])
+@pytest.mark.parametrize("assessment", [A("low", ready=True), "FAIL"])
+def test_sms_alert_requires_human_review_for_new_beneficiary(fake_agent, assessment):
+    calls = fake_agent([assessment])
     sms_alert()
-    r = transfer("casero")
-    assert r.json()["status"] == "on_hold"
+    r = transfer("casero", amount=150)
+    view = r.json()
+    assert view["status"] == "on_hold" and view["done"] is True
+    assert view["outcome"] == {"action": "review", "text": "Tu dinero sigue en tu cuenta. La transferencia queda en revisión."}
     case = cases()[0]
-    assert case["score"] == 45
+    assert case["score"] == 45 and case["decision"]["rule"] == "R7_escudo_destino_nuevo"
+    assert calls == [] and balance() == 2300.0
     sig = next(s for s in case["signals"] if s["id"] == "alerta_estafa_reciente")
     assert sig["detail"].startswith("Hace ") and "recibió un mensaje con señales de estafa" in sig["detail"]
+    decision = client.post(f"{BASE}/cases/{case['id']}/decision", json={"decision": "block", "actor": "familia"})
+    assert decision.json()["status"] == "bloqueada" and balance() == 2300.0
+
+
+def test_flagged_known_destination_stays_in_review_below_threshold(fake_agent, monkeypatch):
+    from app.llamada import service
+
+    calls = fake_agent([A("low", ready=True)])
+    monkeypatch.setattr(service, "FLAGGED_IBANS", [seed.JAVIER_IBAN])
+    view = transfer("normal").json()
+    case = cases()[0]
+    assert case["score"] == 25 and case["decision"]["rule"] == "R6_cuenta_marcada"
+    assert view["done"] and view["outcome"]["action"] == "review"
+    assert calls == [] and balance() == 2300.0
+    path = f"{BASE}/cases/{case['id']}/decision"
+    assert client.post(path, json={"decision": "release"}).json()["status"] == "liberada"
+    assert client.post(path, json={"decision": "release"}).status_code == 409
+    assert balance() == 2100.0
+
+
+@pytest.mark.parametrize("context", [None, {"callActive": False}])
+def test_client_cannot_omit_server_call_signal(context):
+    client.post(f"{BASE}/demo/call", json={"active": True})
+    preset = seed.PRESETS["casero"]
+    body = {key: preset[key] for key in ("amount", "iban", "beneficiaryName")}
+    if context is not None:
+        body["context"] = context
+    view = client.post(f"{BASE}/transfers", json=body).json()
+    assert view["done"] and view["outcome"]["action"] == "review"
+    assert cases()[0]["score"] == 55 and balance() == 2300.0
+
+
+def test_client_cannot_fabricate_call_signal():
+    preset = seed.PRESETS["casero"]
+    body = {key: preset[key] for key in ("amount", "iban", "beneficiaryName")}
+    body["context"] = {"callActive": True}
+    tx = client.post(f"{BASE}/transfers", json=body).json()["transfer"]
+    assert tx["status"] == "ejecutada" and tx["score"] == 20
+    assert balance() == 1700.0
 
 
 def test_sms_alert_then_pay_lucia_executes(fake_agent):
@@ -357,6 +400,6 @@ def test_case_event_published_to_family(fake_agent):
         while not q.empty():
             events.append(q.get_nowait())
         caso = [e for e in events if e["evento"] == "caso"]
-        assert caso and caso[-1]["datos"]["status"] == "retenida"
+        assert caso and caso[-1]["datos"] == {"id": cases()[0]["id"], "status": "retenida"}
     finally:
         bus.unsubscribe("familia", q)

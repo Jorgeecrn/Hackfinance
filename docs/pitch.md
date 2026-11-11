@@ -2,7 +2,9 @@
 
 ## Documento de una cara (texto para el PDF)
 
-**Centinela: la IA que protege a tus padres de las estafas por mensaje**
+**Centinela: protección ante estafas por mensaje y transferencias guiadas**
+
+**Demo de entrega.** Banco Demo simula un SMS del falso hijo. Las reglas activan el escudo, Lucía bloquea el pago desde su panel y el saldo queda intacto. Una llamada simulada genera un caso para el analista. La ejecución local usa datos ficticios y proveedores externos apagados.
 
 **El problema.** Cada día llegan SMS y WhatsApp que suplantan a bancos, Correos o la DGT, y el timo del «hijo en apuros» («Hola mamá, este es mi número nuevo»). En enero de 2026 la Policía Nacional y la Guardia Civil lanzaron una alerta conjunta sobre este fraude, y ya hay casos en España con notas de voz con voz clonada por IA. Las víctimas suelen ser personas mayores. Los filtros actuales solo cubren SMS, solo en algunos móviles, no explican nada y no implican ni a la familia ni al banco.
 
@@ -18,7 +20,7 @@
 - **Familia y banco en el circuito:** es el único que actúa sobre el dinero.
 - Funciona en **cualquier móvil** (PWA), con un modo de respaldo sin IA.
 
-**Resultados** (rellenar con `eval/resultados_ia.md`): precisión X %, recall Y %, falsas alarmas Z %, respuesta media N s sobre M mensajes etiquetados.
+**Resultados.** El conjunto versionado de 74 mensajes es un banco de desarrollo. Las pruebas de esta entrega usan datos ficticios y proveedores simulados.
 
 **Modelo de negocio.** B2B2C: marca blanca dentro de la app del banco (interruptor en *Ajustes → Protección contra estafas*). El banco paga por cliente protegido porque reduce fraude, reclamaciones y daño reputacional, y la nueva normativa europea de pagos (PSR) responsabiliza a las entidades sin controles antifraude adecuados. Además, B2C: suscripción que pagan los hijos para sus padres. Coste por análisis: céntimos (medirlo con los tokens y minutos reales).
 

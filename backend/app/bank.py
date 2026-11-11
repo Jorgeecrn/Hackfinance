@@ -23,16 +23,24 @@ def shield_active(bank: dict) -> bool:
     return bool(until) and datetime.fromisoformat(until) > _now()
 
 
-def activate_shield(reason: str, alert_id: str | None = None, minutes: int | None = None) -> dict:
-    minutes = minutes or settings.shield_minutes
+def new_shield(reason: str, alert_id: str | None = None, minutes: int | None = None) -> dict:
+    until = (_now() + timedelta(minutes=minutes or settings.shield_minutes)).isoformat(timespec="seconds")
+    return {"activo_hasta": until, "motivo": reason, "alerta_id": alert_id}
 
+
+def publish_shield(escudo: dict) -> None:
+    active = bool(escudo["activo_hasta"])
+    bus.publish_many(["banco", "usuario"], "escudo", {"activo": active, **escudo})
+    bus.publish("familia", "escudo", {"activo": active})
+
+
+def activate_shield(reason: str, alert_id: str | None = None, minutes: int | None = None) -> dict:
     def _do(s):
-        until = (_now() + timedelta(minutes=minutes)).isoformat(timespec="seconds")
-        s["banco"]["escudo"] = {"activo_hasta": until, "motivo": reason, "alerta_id": alert_id}
+        s["banco"]["escudo"] = new_shield(reason, alert_id, minutes)
         return s["banco"]["escudo"]
 
     escudo = st.update(_do)
-    bus.publish_many(["banco", "familia", "usuario"], "escudo", {"activo": True, **escudo})
+    publish_shield(escudo)
     return escudo
 
 
@@ -42,7 +50,7 @@ def deactivate_shield() -> dict:
         return s["banco"]["escudo"]
 
     escudo = st.update(_do)
-    bus.publish_many(["banco", "familia", "usuario"], "escudo", {"activo": False, **escudo})
+    publish_shield(escudo)
     return escudo
 
 
@@ -89,7 +97,8 @@ def request_transfer(beneficiario: str, iban: str, importe: float, concepto: str
 
     tx = st.update(_do)
     event = "transferencia_retenida" if tx["estado"] == "retenida" else "transferencia"
-    bus.publish_many(["banco", "familia", "usuario"], event, tx)
+    bus.publish_many(["banco", "usuario"], event, tx)
+    bus.publish("familia", event, {"id": tx["id"], "estado": tx["estado"]})
     return tx
 
 
@@ -111,5 +120,6 @@ def resolve_transfer(tx_id: str, approve: bool) -> dict | None:
 
     tx = st.update(_do)
     if tx:
-        bus.publish_many(["banco", "familia", "usuario"], "transferencia", tx)
+        bus.publish_many(["banco", "usuario"], "transferencia", tx)
+        bus.publish("familia", "transferencia", {"id": tx["id"], "estado": tx["estado"]})
     return tx

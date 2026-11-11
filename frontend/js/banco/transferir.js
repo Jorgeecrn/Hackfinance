@@ -1,6 +1,6 @@
 // Pestaña Transferir: formulario, conversación con el escudo de llamada y resultado.
 import { api, el, toast } from "../common.js";
-import { BASE, goTab, refresh, showScreen, store } from "./core.js";
+import { BASE, goTab, refresh, showScreen } from "./core.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -65,7 +65,6 @@ export function initTransferir() {
     const btn = $("#tx-send");
     btn.disabled = true;
     try {
-      await refresh(); // llamada activa según el panel del presentador
       const res = await api(`${BASE}/transfers`, {
         method: "POST",
         json: {
@@ -73,7 +72,7 @@ export function initTransferir() {
           iban: $("#tx-iban").value,
           beneficiaryName: $("#tx-name").value,
           concept: $("#tx-concept").value,
-          context: { callActive: Boolean(store.state && store.state.callActive), ibanPasted },
+          context: { ibanPasted },
         },
       });
       if (res.status === "executed") {

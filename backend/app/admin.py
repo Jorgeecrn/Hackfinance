@@ -1,24 +1,18 @@
-"""Rutas de administración de la demo: solo desde el propio portátil.
-
-Idea tomada de la seguridad de la API local de hackaton-finance-antifraude (ADR 0013), simplificada: los
-lanzadores arrancan el servidor en 0.0.0.0 para que el móvil de la demo entre por la wifi, así que cualquiera
-en esa red podría reiniciar la demo, simular mensajes o liberar transferencias retenidas. Con esta dependencia,
-esas rutas solo responden a peticiones que llegan desde el propio ordenador (127.0.0.1 / ::1).
-
-- La app del cliente (analizar, transferir, ajustes) sigue funcionando desde el móvil.
-- Detrás de un túnel (cloudflared, ngrok) la petición llega desde 127.0.0.1 pero con cabeceras de reenvío:
-  se trata como remota.
-- ``ADMIN_REMOTO=1`` en el .env desactiva la protección (por ejemplo, si el panel del familiar se abre en
-  otro móvil). No se recomienda en una red compartida.
-"""
+"""Controles de acceso de la demo local y guardia de administración."""
 from __future__ import annotations
+
+import re
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
 
 from .config import settings
 
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
-FORWARD_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip")
+LOCAL_AUTHORITY = re.compile(r"(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]{1,5})?", re.IGNORECASE)
+FORWARD_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "forwarded",
+                   "x-real-ip", "cf-connecting-ip", "true-client-ip")
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 def is_local(request: Request) -> bool:
@@ -29,7 +23,43 @@ def is_local(request: Request) -> bool:
 
 
 def solo_admin(request: Request) -> None:
-    """Dependencia de FastAPI: 403 si la petición no viene del propio portátil."""
-    if settings.admin_remoto or is_local(request):
+    """Dependencia de FastAPI para rutas de administración."""
+    if (settings.admin_remoto and not settings.demo_local) or is_local(request):
         return
     raise HTTPException(403, "Esta acción solo se puede hacer desde el ordenador de la demo")
+
+
+def _origin(url: str) -> tuple[str, str | None, int] | None:
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None
+                or parsed.path or parsed.query or parsed.fragment):
+            return None
+        return parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError:
+        return None
+
+
+def validar_demo_local(request: Request) -> None:
+    """Protege el estado antes de leer cuerpos o suscribir un cliente a SSE."""
+    hosts = request.headers.getlist("host")
+    if len(hosts) != 1 or not LOCAL_AUTHORITY.fullmatch(hosts[0]):
+        raise HTTPException(400, "Usa la dirección local de Centinela")
+    expected_origin = _origin(f"{request.scope['scheme']}://{hosts[0]}")
+    if expected_origin is None:
+        raise HTTPException(400, "Usa la dirección local de Centinela")
+
+    path = request.scope["path"].rstrip("/")
+    if path == "/api/health" and request.method in {"GET", "HEAD"}:
+        return
+    if not (path.startswith("/api/") or path in {"/share-target", "/openapi.json"}):
+        return
+
+    solo_admin(request)
+    site = request.headers.get("sec-fetch-site")
+    if site not in {None, "same-origin", "none"}:
+        raise HTTPException(403, "La solicitud debe venir de esta demo")
+    if request.method not in SAFE_METHODS:
+        origins = request.headers.getlist("origin")
+        if origins and (len(origins) != 1 or _origin(origins[0]) != expected_origin):
+            raise HTTPException(403, "El origen de la solicitud no es el de esta demo")

@@ -5,6 +5,8 @@
 Proyecto desarrollado en el marco del **HackFinance · Madrid Engineering Week**  
 Retos e integraciones técnicas: **GPTadvisor** · **MyInvestor** · **Claude (Anthropic)** · **ElevenLabs**.
 
+**Perfil de entrega.** Banco Demo simula mensajes, llamadas y transferencias con datos ficticios. La demo local usa reglas deterministas, revisión humana y voz del sistema si hay una voz española local. Claude, ElevenLabs, Telegram, RDAP y Safe Browsing están apagados.
+
 ---
 
 ## 📌 El Problema
@@ -25,19 +27,19 @@ Centinela actúa como una capa de protección activa en formato PWA (Progressive
 | 🎙️ **Análisis de Voz y Accesibilidad** | Transcribe audios entrantes vía **ElevenLabs Scribe** y reproduce el veredicto con síntesis de voz natural y empática para usuarios senior. |
 | 🧾 **Dictámenes con Pruebas** | Veredictos basados en evidencias explícitas (🟢 / 🟡 / 🔴) en lugar de índices de probabilidad ambiguos. |
 | 👪 **Consola de Supervisión Familiar** | Alertas en tiempo real a familiares designados (panel web y bot de Telegram) con facultad de autorizar o pausar transferencias retenidas. |
-| 🏦 **Escudo Bancario en Transferencias** | Detección de operaciones bajo coacción o falsos empleados bancarios. Si existe riesgo o llamada en curso, interviene un agente conversacional para romper el guion de la estafa o activar retención preventiva. |
+| 🏦 **Escudo Bancario en Transferencias** | El servidor combina señales de riesgo. Los pagos a cuentas marcadas y los pagos a destinatarios nuevos con una alerta roja activa exigen revisión humana, con cualquier importe. El agente conversacional es opcional. |
 
 ---
 
 ## 🛠️ Stack Tecnológico e Integraciones
 
-- **Anthropic Claude (`claude-3-5-sonnet` / `claude-3-5-haiku`):** Agente investigador autónomo con *tool use*, extracción estructurada de entidades sospechosas e intervención socrática en llamadas de riesgo.
+- **Anthropic Claude (modelo configurable):** Agente investigador autónomo con *tool use*, extracción estructurada de entidades sospechosas e intervención socrática en llamadas de riesgo.
 - **ElevenLabs:**
   - `Scribe`: Transcripción de audios de mensajería para auditoría de ingeniería social.
   - `TTS Natural`: Lectura asistida de veredictos adaptada a personas mayores.
 - **FastAPI (Python 3.11):** Backend asíncrono con arquitectura dirigida por eventos y streaming unidireccional vía Server-Sent Events (SSE).
 - **PWA / Frontend:** Interfaz de alto contraste y tipografía escalada (HTML5, Vanilla JS, CSS sin transpilación), con soporte de Web Share Target.
-- **Simulación Bancaria (MyInvestor / GPTadvisor):** Reglas deterministas de antifraude, retención cautelar y protocolo de doble factor familiar.
+- **Simulación Bancaria (MyInvestor / GPTadvisor):** Reglas deterministas de antifraude, retención cautelar y revisión desde los paneles de familia y analista.
 
 ---
 
@@ -66,9 +68,11 @@ Centinela actúa como una capa de protección activa en formato PWA (Progressive
 
 ### Requisitos previos
 - Python 3.11 o superior.
-- Claves de API de **Anthropic** y **ElevenLabs** *(opcionales: el sistema cuenta con motor determinista de respaldo sin dependencias externas)*.
+- Entorno Python preparado con las dependencias de `requirements.txt`. La demo usa el modo local sin claves de API.
 
 ### Arranque Rápido
+
+Una vez preparado el entorno, abre el lanzador correspondiente. El lanzador no instala dependencias.
 - **En macOS:** Doble clic en `iniciar.command` (si Gatekeeper lo bloquea: clic derecho → *Abrir*).
 - **En Windows:** Doble clic en `iniciar.bat`.
 
@@ -76,7 +80,7 @@ Centinela actúa como una capa de protección activa en formato PWA (Progressive
 
 1. Clonar el repositorio y acceder a la carpeta raíz:
    ```bash
-   git clone <URL_DEL_REPOSITORIO> centinela
+   git clone https://github.com/Jorgeecrn/Hackfinance.git centinela
    cd centinela
    ```
 
@@ -91,38 +95,53 @@ Centinela actúa como una capa de protección activa en formato PWA (Progressive
    pip install -r requirements.txt
    ```
 
-4. Configurar variables de entorno:
+4. Arrancar desde la raíz:
    ```bash
-   cp .env.example .env
+   python iniciar_demo.py
    ```
+
+Si el puerto 8000 está ocupado por otro proceso, indica `--puerto 8001`. Usa la misma dirección local en todas las pestañas.
 
 ---
 
 ## ⚙️ Variables de Entorno (`.env`)
 
+Los lanzadores fuerzan `CENTINELA_DEMO_LOCAL=1`, `FORCE_OFFLINE=1`, `ONLINE_CHECKS=0` y `ADMIN_REMOTO=0`. El perfil de entrega prevalece sobre un `.env` previo. Las claves de esta tabla corresponden a un futuro ensayo autorizado del perfil configurable.
+
 | Variable | Propósito | Requerido |
 |---|---|:---:|
 | `ANTHROPIC_API_KEY` | Habilita el agente investigador y el escudo conversacional | No (modo reglas) |
-| `CLAUDE_MODEL` | Modelo asignado al agente (def: `claude-3-5-sonnet-latest`) | No |
+| `CLAUDE_MODEL` | Modelo asignado al agente (valor en `backend/app/config.py`) | No |
 | `ELEVENLABS_API_KEY` | Transcripción de audios y lectura de alertas con voz natural | No (voz nativa) |
 | `ELEVENLABS_VOICE_ID` | Identificador de voz para los avisos en ElevenLabs | No |
 | `GOOGLE_SAFE_BROWSING_KEY` | Comprobación de URLs sospechosas contra Google Safe Browsing | No |
 | `TELEGRAM_BOT_TOKEN` | Token para envío de notificaciones directas al tutor familiar | No |
 | `TELEGRAM_CHAT_ID` | Identificador de chat en Telegram | No |
 | `SHIELD_MINUTES` | Duración del bloqueo preventivo tras alerta roja (def: `60`) | No |
-| `SHIELD_AMOUNT_THRESHOLD` | Umbral en euros para activación de retención (def: `300`) | No |
+| `SHIELD_AMOUNT_THRESHOLD` | Umbral de la API bancaria anterior. Banco Demo revisa cualquier importe si hay alerta activa y destinatario nuevo | No |
 
 ---
 
 ## 🖥️ Enlaces de Interfaz
 
-Con el backend en ejecución (`uvicorn app.main:app --host 0.0.0.0 --port 8000` dentro de `backend/`):
+El lanzador escucha en `127.0.0.1` y abre Banco Demo. Usa el mismo portátil para la demo. Puedes mostrar la app a tamaño móvil con las herramientas del navegador.
 
-- **App Principal (Senior / Banco):** `http://localhost:8000/`
-- **Panel Familiar:** `http://localhost:8000/familia.html`
-- **Panel de Simulación de Escenarios:** `http://localhost:8000/demo.html`
-- **Consola del Analista de Fraude:** `http://localhost:8000/llamada/analista.html`
-- **Documentación Swagger OpenAPI:** `http://localhost:8000/docs`
+- **App Principal (Senior / Banco):** `http://127.0.0.1:8000/`
+- **Panel Familiar:** `http://127.0.0.1:8000/familia.html`
+- **Panel de Simulación de Escenarios:** `http://127.0.0.1:8000/demo.html`
+- **Consola del Analista de Fraude:** `http://127.0.0.1:8000/llamada/analista.html`
+- **Presentador de llamada simulada:** `http://127.0.0.1:8000/llamada/presentador.html`
+- **Esquema de la API:** `http://127.0.0.1:8000/openapi.json`
+
+El perfil local valida el host y el origen de las escrituras. Las rutas privadas y los canales SSE rechazan acceso remoto. Los eventos de familia anuncian el cambio con datos mínimos y el panel consulta el detalle por la API.
+
+### Guion de entrega
+
+1. Reinicia desde **Perfil → Herramientas de demo → Reiniciar toda la demo**. En **Transferir**, ejecuta el escenario 1 de **200 € a Javier**. La corriente pasa de **2.300 € a 2.100 €**.
+2. Desde el panel de mensajes, envía **Falso hijo con número nuevo**. Carmen ve la alerta y Lucía recibe un aviso en su panel.
+3. En Carmen, abre el escenario 2, cambia el beneficiario a «Mi hijo» y el importe a **150 €**. La operación queda en revisión. Lucía pulsa **Bloquear**. El saldo sigue en **2.100 €**.
+4. Reinicia para partir sin alerta previa. Activa **Llamada activa** en el presentador de llamada, traspasa **8.000 €** de ahorro a corriente y usa el escenario 3. Los **8.500 €** quedan pendientes en el panel del analista. La corriente conserva **10.300 €**.
+5. Comprueba un mensaje de texto manualmente en Protección. La demo muestra el resultado escrito y usa una voz local si está disponible. Capturas y transcripción quedan fuera del ensayo local.
 
 ---
 
@@ -132,12 +151,12 @@ Con el backend en ejecución (`uvicorn app.main:app --host 0.0.0.0 --port 8000` 
 # Ejecutar tests unitarios automáticos (sin conexión externa ni claves)
 cd backend && python -m pytest -q
 
-# Ejecutar benchmark sobre dataset de 74 casos etiquetados (40 fraudes, 34 benignos)
+# Ejecutar las reglas sobre 74 casos de desarrollo (40 fraudes, 34 legítimos)
 cd .. && python eval/run_eval.py --modo reglas    # Modo determinista (gratuito)
-python eval/run_eval.py --modo ia                 # Modo agente completo con Claude
+# El modo ia requiere un perfil configurable y autorización de gasto.
 ```
 
-Los resultados con métricas de *precision*, *recall*, falsos positivos y latencia se almacenan en `eval/resultados_<modo>.md`.
+Los resultados se guardan en `eval/resultados_<modo>.md`. Son métricas del banco de desarrollo. Para una evaluación independiente se necesita otro conjunto con etiquetas revisadas.
 
 ---
 

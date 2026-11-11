@@ -6,6 +6,7 @@ import base64
 import json
 import logging
 import time
+from contextlib import aclosing
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -13,16 +14,37 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import bank, budget, elevenlabs, state as st, tools
-from .admin import solo_admin
+from .admin import solo_admin, validar_demo_local
 from .analyzer import analyze, analyze_stream, notify_family
 from .config import DATA_DIR, FRONTEND_DIR, settings
 from .events import bus, sse_format
+from .llamada import service as llamada_service
 from .llamada.router import router as llamada_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("centinela")
 
-app = FastAPI(title="Centinela API", version="1.0.0", description="Detector de estafas por mensajes para personas mayores")
+app = FastAPI(
+    title="Centinela API",
+    version="1.0.0",
+    description="Detector de estafas por mensajes para personas mayores",
+    docs_url=None if settings.demo_local else "/docs",
+    redoc_url=None if settings.demo_local else "/redoc",
+)
+
+
+@app.middleware("http")
+async def proteger_demo_local(request: Request, call_next):
+    if settings.demo_local:
+        try:
+            validar_demo_local(request)
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    response = await call_next(request)
+    if settings.demo_local and request.scope["path"].startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
 
 MAX_UPLOAD = 15 * 1024 * 1024
 _shares: dict[str, dict] = {}
@@ -80,7 +102,7 @@ class Reporte(BaseModel):
 async def _read_upload(archivo: UploadFile | None) -> tuple[bytes, str, str] | None:
     if archivo is None or not archivo.filename:
         return None
-    data = await archivo.read()
+    data = await archivo.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "El archivo es demasiado grande (máximo 15 MB)")
     if not data:
@@ -93,10 +115,13 @@ async def _read_upload(archivo: UploadFile | None) -> tuple[bytes, str, str] | N
 def health():
     return {
         "ok": True,
+        "servicio": "centinela",
+        "perfil": "demo-local" if settings.demo_local else "configurable",
         "ia": settings.claude_enabled,
         "modelo": settings.claude_model if settings.claude_enabled else None,
         "voz": settings.elevenlabs_enabled,
-        "telegram": bool(settings.telegram_bot_token and settings.telegram_chat_id),
+        "telegram": settings.telegram_enabled,
+        "consultas_online": settings.online_checks and not settings.force_offline,
     }
 
 
@@ -107,7 +132,7 @@ def get_profile():
 
 
 @app.put("/api/perfil")
-def put_profile(p: Perfil):
+async def put_profile(p: Perfil):
     def _do(s):
         data = p.model_dump(exclude_none=True)
         contactos = data.pop("contactos", None)
@@ -117,7 +142,8 @@ def put_profile(p: Perfil):
         return {**s["perfil"], "contactos": s["contactos"]}
 
     perfil = st.update(_do)
-    bus.publish_many(["usuario", "familia"], "perfil", perfil)
+    bus.publish("usuario", "perfil", perfil)
+    bus.publish("familia", "perfil", {})
     return perfil
 
 
@@ -135,6 +161,8 @@ async def analizar(
                            archivo=upload, mensaje_id=mensaje_id or None)
     if "error" in result:
         return JSONResponse(result, status_code=422)
+    if result.get("pendiente"):
+        return JSONResponse(result, status_code=202)
     return result
 
 
@@ -150,9 +178,11 @@ async def analizar_stream(
     upload = await _read_upload(archivo)
 
     async def gen():
-        async for ev in analyze_stream(texto=texto.strip(), remitente=remitente.strip() or None, canal=canal,
-                                       archivo=upload, mensaje_id=mensaje_id or None):
-            yield f"event: {ev['tipo']}\ndata: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        stream = analyze_stream(texto=texto.strip(), remitente=remitente.strip() or None, canal=canal,
+                                archivo=upload, mensaje_id=mensaje_id or None)
+        async with aclosing(stream):
+            async for ev in stream:
+                yield f"event: {ev['tipo']}\ndata: {json.dumps(ev, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
@@ -203,10 +233,16 @@ async def demo_entrante(m: Incoming):
     def _do(s):
         s["mensajes"].insert(0, msg)
         s["mensajes"] = s["mensajes"][:50]
+        return s["perfil"]["proteccion_activa"]
 
-    st.update(_do)
-    bus.publish("usuario", "mensaje", msg)
-    return msg
+    protect = st.update(_do)
+    bus.publish("usuario", "mensaje", {"id": msg["id"]})
+    if protect:
+        try:
+            await analyze(mensaje_id=msg["id"], automatico=True)
+        except Exception:
+            log.warning("El SMS simulado quedó pendiente de análisis")
+    return st.find_message(st.load(), msg["id"]) or msg
 
 
 @app.get("/api/demo/ejemplos")
@@ -215,8 +251,10 @@ def demo_ejemplos():
 
 
 @app.post("/api/demo/reset", dependencies=[Depends(solo_admin)])
-def demo_reset():
+async def demo_reset():
     s = st.reset()
+    llamada_service.reset()
+    _shares.clear()
     bus.publish_many(["usuario", "familia", "banco"], "reset", {})
     return {"ok": True, "perfil": s["perfil"]}
 
@@ -249,12 +287,12 @@ def get_banco():
 
 
 @app.post("/api/banco/transferencia")
-def transferencia(t: Transferencia):
+async def transferencia(t: Transferencia):
     return bank.request_transfer(t.beneficiario, t.iban, t.importe, t.concepto, t.canal)
 
 
 @app.post("/api/banco/transferencias/{tx_id}/{accion}", dependencies=[Depends(solo_admin)])
-def resolver(tx_id: str, accion: str):
+async def resolver(tx_id: str, accion: str):
     if accion not in {"aprobar", "cancelar"}:
         raise HTTPException(400, "Acción no válida")
     tx = bank.resolve_transfer(tx_id, accion == "aprobar")
@@ -264,7 +302,7 @@ def resolver(tx_id: str, accion: str):
 
 
 @app.post("/api/banco/escudo/{accion}", dependencies=[Depends(solo_admin)])
-def escudo(accion: str):
+async def escudo(accion: str):
     if accion == "activar":
         return bank.activate_shield("Activado manualmente")
     if accion == "desactivar":
@@ -277,9 +315,8 @@ def escudo(accion: str):
 async def eventos(canal: str, request: Request):
     if canal not in {"usuario", "familia", "banco"}:
         raise HTTPException(404)
-    q = bus.subscribe(canal)
-
     async def gen():
+        q = bus.subscribe(canal)
         try:
             yield "retry: 3000\n\n"
             while True:
@@ -319,7 +356,7 @@ async def share_target(
 @app.get("/api/compartido/{share_id}")
 def compartido(share_id: str):
     data = _shares.pop(share_id, None)
-    if not data:
+    if not data or time.time() - data["t"] > 600:
         raise HTTPException(404, "Contenido compartido no encontrado o caducado")
     return data
 

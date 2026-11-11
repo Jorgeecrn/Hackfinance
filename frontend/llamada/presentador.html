@@ -18,7 +18,7 @@
       <span class="tag" id="model">—</span>
     </header>
     <main class="ll-screen">
-      <div class="ll-warn hidden" id="no-key">Falta ANTHROPIC_API_KEY: las transferencias arriesgadas irán al analista sin conversación.</div>
+      <div class="ll-warn hidden" id="no-key">Agente externo apagado. Las transferencias de riesgo pasan a revisión humana.</div>
 
       <section class="card">
         <div class="ll-big-switch" id="call-box">
@@ -35,9 +35,9 @@
         <h2>Guion</h2>
         <ol class="ll-steps">
           <li><strong>Escenario 1 · normal:</strong> sin llamada, 200 € a Javier → se envía al instante, el agente no aparece.</li>
-          <li><strong>Escenario 3 · estafa:</strong> activa la llamada; la víctima traspasa 8.000 € del ahorro y envía 8.500 € a un IBAN pegado → el Escudo pregunta y la retiene.</li>
-          <li><strong>Analista:</strong> puntuación, señales, conversación y decisión; bloquear.</li>
-          <li><strong>Escenario 2 · casero:</strong> llamada activa, 600 € al casero → una o dos preguntas y se envía.</li>
+          <li><strong>Escenario 3 · estafa:</strong> activa la llamada; la víctima traspasa 8.000 € del ahorro y envía 8.500 € a un IBAN pegado → el Escudo envía el pago a revisión.</li>
+          <li><strong>Analista:</strong> puntuación, señales y decisión. El analista puede bloquear.</li>
+          <li><strong>Escenario 2 · casero:</strong> llamada activa, 600 € al casero → con el agente apagado, pasa a revisión humana.</li>
         </ol>
       </section>
 
